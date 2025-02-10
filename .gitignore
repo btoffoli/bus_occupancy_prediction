@@ -1,0 +1,12 @@
+.idea
+*.iml
+.venv
+*.log
+transcol
+known_faces
+images/
+*.pt
+*.dat
+**/__pycache__/**
+inmet*
+var
