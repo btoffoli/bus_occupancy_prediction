@@ -23,6 +23,7 @@ CREATE TABLE weather_data (
     PRIMARY KEY (id, reading_time)
 ) PARTITION BY RANGE (reading_time);
 
+ALTER TABLE weather_data ADD CONSTRAINT unique_weather_data_reading_city UNIQUE (reading_time, city);
 
 CREATE OR REPLACE FUNCTION create_weather_data_partition(month_date DATE)
 RETURNS VOID AS $$
