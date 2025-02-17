@@ -31,6 +31,15 @@ def main():
         'port': int(os.getenv('DB_PORT', 5432))
     }
 
+    db_config_pontual = {
+        'dbname': os.getenv('DB_NAME_PONTUAL'),
+        'user': os.getenv('DB_USER_PONTUAL'),
+        'password': os.getenv('DB_PASSWORD_PONTUAL'),
+        'host': os.getenv('DB_HOST_PONTUAL', 'localhost'),
+        'port': int(os.getenv('DB_PORT_PONTUAL', 5432))
+
+    }
+
     path_to_csv_dir = os.getenv('PATH_TO_CSV_DIR')
 
     logger.info(f"path_to_csv_dir: {path_to_csv_dir}")

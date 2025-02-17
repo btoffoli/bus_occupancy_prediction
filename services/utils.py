@@ -1,4 +1,7 @@
 import re
+import argparse
+
+from datetime import datetime, date
 
 
 def extract_city(filename: str) -> str:
@@ -12,6 +15,13 @@ def extract_city(filename: str) -> str:
 
   # Extract the city name if a match is found
   return match.group(1) if match else None
+
+def valid_date(date_str) -> date:
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid date format: {date_str}. Use YYYY-MM-DD.")
+
 
 if __name__ == '__main__':
   # Example filename
