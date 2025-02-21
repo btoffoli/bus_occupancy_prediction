@@ -59,14 +59,26 @@ class ItineraryBusstopAssociation:
     id: int
     itinerary_id: int
     busstop_id: int
-    bustop_code: str
+    busstop_code: str
+    busstop_location: Point
     location: int
 
-    def __init__(self, id, itinerary_id, busstop_id, bustop_code, location):
+    def __init__(self, 
+                id: int, 
+                itinerary_id: int, 
+                busstop_id: int, 
+                busstop_code: str,                
+                location: int,
+                busstop_location: str
+                ):
+        
+        
+
         self.id = id
         self.itinerary_id = itinerary_id
         self.busstop_id = busstop_id
-        self.bustop_code = bustop_code
+        self.busstop_code = busstop_code
+        self.busstop_location = from_wkt(busstop_location)
         self.location = location
 
     def __hash__(self):
@@ -96,6 +108,21 @@ class Itinerary:
         # print(f"self.geo: {type(self.geo)}")
         self.itinerary_busstop_associations : list[ItineraryBusstopAssociation] = []
 
+    
+    def add_itinerary_busstop_association(self, association: ItineraryBusstopAssociation):
+        self.itinerary_busstop_associations.append(association)
+        sorted(self.itinerary_busstop_associations, key=lambda x: x.location)
+
+
+
+    def __len__(self):
+        if self.itinerary_busstop_associations:
+            bustop_association = self.itinerary_busstop_associations[-1]
+            return bustop_association.location
+        else:
+            return 0
+
+
 
     def __hash__(self):
         return hash(self.id)
@@ -103,6 +130,62 @@ class Itinerary:
     def __eq__(self, other):
         return self.id == other.id
     
+
+@dataclass
+class VehiclerunBusStopoccupation:
+    #vehiclerun data
+    itinerary_code: str
+    itinerary_size: int
+    scheduled_time: str
+    trip_start_time: str
+    trip_completion_time: str
+    vehicle_id: int
+
+    #busstop_occupation_data
+    busstop_code: str
+    bustop_location: int
+    reading_time: datetime
+    occupation: int
+    occupation_geo: Point
+    occupation_location: int
+    normalized_location: float
+
+    
+    
+
+    def __init__(self, 
+                 itinerary: Itinerary,
+                 vehiclerun: VehicleRunData, 
+                 bus_occupation: BusOccupation,                 
+                 association: ItineraryBusstopAssociation,
+                 occupation_location: int
+                 ):
+        self.itinerary_code = itinerary.code
+        self.itinerary_size = len(itinerary)
+        self.scheduled_time = vehiclerun.scheduledtime
+        self.trip_start_time = vehiclerun.tripstarttime
+        self.trip_completion_time = vehiclerun.tripcompletiontime
+        self.vehicle_id = vehiclerun.vehicle_id
+        self.busstop_code = association.busstop_code
+        self.bustop_location = association.location
+        self.reading_time = bus_occupation.reading_time
+        self.occupation = bus_occupation.occupation
+        self.occupation_geo = bus_occupation.geo
+        self.occupation_location = occupation_location
+        self.normalized_location = self.bustop_location / self.itinerary_size
+
+        def to_dict(self):
+            return {
+                'itinerary_code': self.itinerary_code,
+                'itinerary_size': self.itinerary_size,
+                'scheduled_time': self.scheduled_time,
+                'trip_start_time': self.trip_start_time,
+                'trip_completion_time': self.trip_completion_time,
+                'vehicle_id': self.vehicle_id,
+            }
+        
+
+
 
 
 

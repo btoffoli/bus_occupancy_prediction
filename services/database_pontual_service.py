@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2.extras import execute_batch
 from typing import List
 from models.weather_data import WeatherData
-from models.pontual_data import VehicleRunData, Itinerary, ItineraryBusstopAssociation, BusOccupation
+from models.pontual_data import VehicleRunData, Itinerary, ItineraryBusstopAssociation, BusOccupation, VehiclerunBusStopoccupation
 from datetime import date, timedelta
 
 
@@ -25,12 +25,14 @@ class DatabaseService:
         self.db_config = db_config
 
         self.current_date = start_date
-
-        self.itinerarys : dict[int, Itinerary] = dict()
-        self.bus_ocuppation : list[BusOccupation] = []
-
-
+        self.__initialize()
         self.connect()
+
+
+    def __initialize(self):
+        self.itinerarys : dict[int, Itinerary] = dict()
+        self.bus_occupation : list[BusOccupation] = []
+        self.vehiclerun_bus_stop_ocuppations = []
 
     
 
@@ -66,10 +68,10 @@ class DatabaseService:
             cursor.execute(sql_list_itinerarys_busstop_associations, (list(itineray_ids),))
             l = cursor.fetchall()            
             itinerarys_busstop_association_current = None
-            for i in l:
+            for i in l:                
                 itinerarys_busstop_association = ItineraryBusstopAssociation(*i)
                 itinerary = self.itinerarys.get(itinerarys_busstop_association.itinerary_id)
-                itinerary.itinerary_busstop_associations.append(itinerarys_busstop_association)
+                itinerary.add_itinerary_busstop_association(itinerarys_busstop_association)
 
 
         print(f"self.itinerarys: {len(self.itinerarys)}\n\n\n\n")
@@ -77,16 +79,51 @@ class DatabaseService:
     def load_bus_occupation_of_day(self, day: date, vehicle_ids: set[int]):
         if not vehicle_ids:
             return
-        self.bus_ocuppation.clear()
+        self.bus_occupation.clear()
         with self.connection.cursor() as cursor:
             cursor.execute(sql_list_bus_occupation_of_day.replace('YEARMONTH', day.strftime('%Y%m')), (list(set(id for id in vehicle_ids)), day, day + timedelta(days=1)))
             l = cursor.fetchall()            
             for i in l:
-                self.bus_ocuppation.append(BusOccupation(*i))
+                self.bus_occupation.append(BusOccupation(*i))
 
-        print(f"self.bus_ocuppation: {len(self.bus_ocuppation)}")
-                
+        print(f"self.bus_occupation: {len(self.bus_occupation)}")
 
+    
+    def load_vehiclerun_bus_stop_ocuppation(self, vehiclerun: VehicleRunData):
+        # for vehiclerun in self.vehicleruns:
+        itinerary = self.itinerarys.get(vehiclerun.itinerary_id)
+        if not itinerary:
+            print(f"itinerary not found for vehiclerun: {vehiclerun}")
+            return
+
+        if not itinerary.itinerary_busstop_associations:
+            print(f"itinerary_busstop_associations not found for itinerary: {itinerary}")
+            return
+        
+        
+        reversed_bus_occupation = sorted(filter(lambda x: x.vehicle_id == vehiclerun.vehicle_id and x.reading_time >= vehiclerun.tripstarttime and x.reading_time < vehiclerun.tripcompletiontime, self.bus_occupation), key=lambda x: x.reading_time, reverse=True)
+        for association in itinerary.itinerary_busstop_associations:
+            # find last bus ocuppation before bus stop in current association
+            last_bus_occupation, occupation_location = None, None
+            for bus_occupation in reversed_bus_occupation:
+                occupation_location = itinerary.geo.project(bus_occupation.geo)
+                if occupation_location < association.location:
+                    last_bus_occupation = bus_occupation
+                    break
+
+            
+            if last_bus_occupation is not None:
+                vehiclerun_bus_stop_ocuppation = VehiclerunBusStopoccupation(
+                        itinerary,
+                        vehiclerun,
+                        last_bus_occupation,
+                        association,
+                        occupation_location
+                    )
+            
+                print(f"vehiclerun_bus_stop_ocuppation: {vehiclerun_bus_stop_ocuppation}")
+
+                self.vehiclerun_bus_stop_ocuppations.append(vehiclerun_bus_stop_ocuppation)
 
         
 
@@ -98,6 +135,10 @@ class DatabaseService:
             itinerarys = set(vr.itinerary_id for vr in vehicleruns)
             self.load_itinerarys_not_loaded(itinerarys)
             self.load_bus_occupation_of_day(self.current_date, set(vr.vehicle_id for vr in vehicleruns))
+            for vehiclerun in vehicleruns:                
+                self.load_vehiclerun_bus_stop_ocuppation(vehiclerun)
+            
+            print(f"self.vehiclerun_bus_stop_ocuppations: {len(self.vehiclerun_bus_stop_ocuppations)}")
             # print(f"itinerarys: {len(self.itinerarys)}")
             # print(f"vehicleruns: {vehicleruns}")
             self.current_date += timedelta(days=1)
@@ -140,16 +181,20 @@ sql_list_itinerarys = """
 sql_list_itinerarys_busstop_associations = """
     SELECT
         api.id,
-        api.itinerario_id,
+        api.itinerario_id itinerary_id,
         p.id busstop_id,
-        p.codigo bustop_code,
-        api.localizacao "location"       
+        p.codigo busstop_code,        
+        api.localizacao "location",
+        ST_ASText(p.geometria) busstop_location
     FROM
         pontual.associacao_ponto_itinerario api
     JOIN
         pontual.ponto_de_parada p
             ON p.id = api.ponto_de_parada_id
-    WHERE api.itinerario_id = ANY(%s::INT[])
+    WHERE 
+        TRUE
+        AND api.itinerario_id = ANY(%s::INT[])
+        AND api.localizacao IS NOT NULL
     ORDER BY itinerario_id, "location"
 """
 
