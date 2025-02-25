@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 
 from services.file_reader import FileReader
-from services.database_service import DatabaseService
+from services.database_weather_service import DatabaseService
 from models.weather_data import WeatherData
 
 # Configuração do logging

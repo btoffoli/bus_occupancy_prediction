@@ -19,7 +19,6 @@ class FileReader:
 
 
         # Tenta abrir o arquivo com diferentes encodings
-        
         try:
             with open(file_path, mode='r', encoding=encoding) as file:
                 reader = csv.DictReader(file, delimiter=';')

@@ -131,9 +131,13 @@ class Itinerary:
         return self.id == other.id
     
 
+from dataclasses import dataclass
+from datetime import datetime
+from shapely.geometry import Point
+
 @dataclass
 class VehiclerunBusStopoccupation:
-    #vehiclerun data
+    # vehiclerun data
     itinerary_code: str
     itinerary_size: int
     scheduled_time: str
@@ -141,7 +145,7 @@ class VehiclerunBusStopoccupation:
     trip_completion_time: str
     vehicle_id: int
 
-    #busstop_occupation_data
+    # busstop_occupation_data
     busstop_code: str
     bustop_location: int
     reading_time: datetime
@@ -150,14 +154,11 @@ class VehiclerunBusStopoccupation:
     occupation_location: int
     normalized_location: float
 
-    
-    
-
-    def __init__(self, 
-                 itinerary: Itinerary,
-                 vehiclerun: VehicleRunData, 
-                 bus_occupation: BusOccupation,                 
-                 association: ItineraryBusstopAssociation,
+    def __init__(self,
+                 itinerary: 'Itinerary',
+                 vehiclerun: 'VehicleRunData',
+                 bus_occupation: 'BusOccupation',
+                 association: 'ItineraryBusstopAssociation',
                  occupation_location: int
                  ):
         self.itinerary_code = itinerary.code
@@ -174,19 +175,22 @@ class VehiclerunBusStopoccupation:
         self.occupation_location = occupation_location
         self.normalized_location = self.bustop_location / self.itinerary_size
 
-        def to_dict(self):
-            return {
-                'itinerary_code': self.itinerary_code,
-                'itinerary_size': self.itinerary_size,
-                'scheduled_time': self.scheduled_time,
-                'trip_start_time': self.trip_start_time,
-                'trip_completion_time': self.trip_completion_time,
-                'vehicle_id': self.vehicle_id,
-            }
-        
-
-
-
+    def to_dict(self):
+        return {
+            'itinerary_code': self.itinerary_code,
+            'itinerary_size': self.itinerary_size,
+            'scheduled_time': self.scheduled_time,
+            'trip_start_time': self.trip_start_time,
+            'trip_completion_time': self.trip_completion_time,
+            'vehicle_id': self.vehicle_id,
+            'busstop_code': self.busstop_code,
+            'bustop_location': self.bustop_location,
+            'reading_time': self.reading_time.isoformat(),  # Convert datetime to string
+            'occupation': self.occupation,
+            'occupation_geo': self.occupation_geo.wkt,  # Convert Point to Well-Known Text format
+            'occupation_location': self.occupation_location,
+            'normalized_location': self.normalized_location
+        }
 
 
 

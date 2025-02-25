@@ -60,8 +60,56 @@ END $$;
 
 
 
+CREATE TABLE IF NOT EXISTS public.vehiclerun_bus_stop_occupation (
+    itinerary_code character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    itinerary_size integer NOT NULL,
+    scheduled_time timestamp without time zone NOT NULL,
+    trip_start_time timestamp without time zone NOT NULL,
+    trip_completion_time timestamp without time zone NOT NULL,
+    vehicle_id integer NOT NULL,
+    busstop_code character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    bustop_location integer NOT NULL,
+    reading_time timestamp without time zone NOT NULL,
+    occupation integer NOT NULL,
+    occupation_geo geometry(Point,4326) NOT NULL,
+    occupation_location integer NOT NULL,
+    normalized_location double precision NOT NULL,
+    CONSTRAINT vehiclerunbusstopoccupation_pkey PRIMARY KEY (itinerary_code, scheduled_time, busstop_code)
+) PARTITION BY RANGE (scheduled_time);
+
+
+CREATE OR REPLACE FUNCTION create_vehiclerun_bus_stop_occupation_partition(start_date DATE, end_date DATE)
+RETURNS VOID AS $$
+DECLARE
+    partition_name TEXT;
+    partition_range TEXT;
+BEGIN
+    -- Loop through each month in the given date range
+    FOR start_date, end_date IN
+        SELECT
+            d,
+            d + INTERVAL '1 month' - INTERVAL '1 day'
+        FROM generate_series(start_date, end_date, '1 month') AS d
+    LOOP
+        -- Define the partition name and range
+        partition_name := 'vehiclerun_bus_stop_occupation_' || TO_CHAR(start_date, 'YYYY_MM');
+        partition_range := 'FOR VALUES FROM (''' || start_date || ''') TO (''' || end_date || ''')';
+
+        -- Create the partition
+        EXECUTE 'CREATE TABLE IF NOT EXISTS public.' || partition_name || ' PARTITION OF public.vehiclerun_bus_stop_occupation ' || partition_range;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT create_vehiclerun_bus_stop_occupation_partition('2022-01-01'::DATE, '2026-01-01'::DATE);
+
 -- verificando se foram criadas
 SELECT relname AS partition_name
 FROM pg_class
-WHERE relkind = 'r' AND relname LIKE 'weather_data_%'
+WHERE relkind = 'r' AND 
+    (relname LIKE 'weather_data_%'
+        OR relname LIKE 'vehiclerun_bus_stop_occupation_%')
 ORDER BY relname;
+
+
+
