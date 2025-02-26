@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, date
 
 
+
 def extract_city(filename: str) -> str:
   # pattern = r"INMET_SE_SP_A\d{3}_([A-Z]+)_\d{2}-\d{2}-\d{4}_A_\d{2}-\d{2}-\d{4}\.CSV"
   # pattern = r"INMET_SE_([A-Z]{2}+)_A\d{3}_([A-Z]+)_\d{2}-\d{2}-\d{4}_A_\d{2}-\d{2}-\d{4}\.CSV"
@@ -22,6 +23,8 @@ def valid_date(date_str) -> date:
     except ValueError:
         raise argparse.ArgumentTypeError(f"Invalid date format: {date_str}. Use YYYY-MM-DD.")
 
+
+   
 
 if __name__ == '__main__':
   # Example filename

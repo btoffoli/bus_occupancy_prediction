@@ -6,6 +6,8 @@ import os
 
 from services.database_weather_service import DatabaseService
 from services.database_pontual_service import DatabaseService as DatabaseServicePontual
+from services.database_bus_occupation_service import DatabaseService as DatabaseServiceBusOccupation
+
 
 from models.weather_data import WeatherData
 from datetime import date
@@ -61,9 +63,24 @@ def main():
 
     logger.info(f"path_to_csv_dir: {path_to_csv_dir}")
 
+    # Configurações do banco de dados
+    db_config = {
+        'dbname': args.db_name or os.getenv('DB_NAME'),
+        'user': args.db_user or os.getenv('DB_USER'),
+        'password': args.db_password or os.getenv('DB_PASSWORD'),
+        'host': args.db_host or os.getenv('DB_HOST'),
+        'port': args.db_port or os.getenv('DB_PORT')
+    }
+    print(f"db_config: {db_config}")
+    # Diretório contendo os arquivos CSV
+    data_dir = Path(path_to_csv_dir)
+    db_weather_service = DatabaseService(db_config, data_dir)
+
+    print(f"args.mode: {args.mode}")
+
     # Executa o modo específico
     if args.mode == 'vehiclerun':
-        print(f"args: {args}")
+        print(f"vehiclerun - args: {args}")
         # Configurações do banco de dados
         db_config = {
             'dbname': args.db_name_pontual or os.getenv('DB_NAME_PONTUAL'),
@@ -73,27 +90,20 @@ def main():
             'port': args.db_port_pontual or os.getenv('DB_PORT_PONTUAL')
         }
         print(f"db_config: {db_config}")
+
+        data_base_occupation_service = DatabaseServiceBusOccupation(db_config)
         
-        db_service = DatabaseServicePontual(db_config, args.start_date, args.end_date)
+        db_service = DatabaseServicePontual(db_config, args.start_date, args.end_date, db_weather_service, data_base_occupation_service)
         db_service.run()
         
     elif args.mode == 'inmet':
-        # Configurações do banco de dados
-        db_config = {
-            'dbname': args.db_name or os.getenv('DB_NAME'),
-            'user': args.db_user or os.getenv('DB_USER'),
-            'password': args.db_password or os.getenv('DB_PASSWORD'),
-            'host': args.db_host,
-            'port': args.db_port
-        }
-        # Diretório contendo os arquivos CSV
-        data_dir = Path(path_to_csv_dir)
-        db_service = DatabaseService(db_config, data_dir)
-        db_service.run()
+        print(f"inmet args: {args}")
+        
+        # db_weather_service.run()
 
 
     # Fecha a conexão com o banco de dados
-    db_service.close()
+    db_weather_service.close()
     logger.info("Database connection closed.")
 
 if __name__ == "__main__":

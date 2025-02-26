@@ -154,6 +154,12 @@ class VehiclerunBusStopoccupation:
     occupation_location: int
     normalized_location: float
 
+    temperature: float
+    humidity: float
+    wind_speed: float
+    precipitation: float
+
+
     def __init__(self,
                  itinerary: 'Itinerary',
                  vehiclerun: 'VehicleRunData',
@@ -189,7 +195,12 @@ class VehiclerunBusStopoccupation:
             'occupation': self.occupation,
             'occupation_geo': self.occupation_geo.wkt,  # Convert Point to Well-Known Text format
             'occupation_location': self.occupation_location,
-            'normalized_location': self.normalized_location
+            'normalized_location': self.normalized_location,
+            'temperature': self.temperature,
+            'humidity': self.humidity,
+            'wind_speed': self.wind_speed,
+            'precipitation': self.precipitation
+        
         }
 
 

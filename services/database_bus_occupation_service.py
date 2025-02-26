@@ -10,9 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class DatabaseService:
-    def __init__(self, db_config: dict, data_dir: str, batch_size: int = 1000):
-        self.db_config = db_config
-        self.data_dir = data_dir
+    def __init__(self, db_config: dict, batch_size: int = 1000):
+        self.db_config = db_config        
         self.batch_size = batch_size
         self.connect()
         
@@ -40,7 +39,12 @@ class DatabaseService:
                 occupation,
                 occupation_geo,
                 occupation_location,
-                normalized_location
+                normalized_location,
+                temperature,
+                humidity,
+                wind_speed,
+                precipitation
+
             )
             VALUES (
                 %(itinerary_code)s,
@@ -55,7 +59,11 @@ class DatabaseService:
                 %(occupation)s,
                 %(occupation_geo)s,
                 %(occupation_location)s,
-                %(normalized_location)s
+                %(normalized_location)s,
+                %(temperature)s,
+                %(humidity)s,
+                %(wind_speed)s,
+                %(precipitation)s
             )
             ON CONFLICT (itinerary_code, scheduled_time, busstop_code)
             DO UPDATE SET
@@ -69,6 +77,10 @@ class DatabaseService:
                 occupation_geo = EXCLUDED.occupation_geo,
                 occupation_location = EXCLUDED.occupation_location,
                 normalized_location = EXCLUDED.normalized_location;
+                temperature = EXCLUDED.temperature,
+                humidity = EXCLUDED.humidity,
+                wind_speed = EXCLUDED.wind_speed,
+                precipitation = EXCLUDED.precipitation;
             """
             data = [
                 wd.to_dict()
@@ -91,35 +103,15 @@ class DatabaseService:
             self.connection.commit()
 
 
-    def destroy(self):
-        self.connection.close()
+    def reinitialize(self):
+        self.close()
+        self.connect()
+        
+
     def close(self):
-        if self.connection:
-            self.connection.close()    
+        if self.connection and self.connection.closed == 0:
+            self.connection.close()
+            self.connection = None
+            
 
-    
-    def run(self):
-        # Processa cada arquivo CSV no diretório
-        try:        
-            for csv_file in self.data_dir.glob('*.CSV'):
-                logger.info(f"Processing file: {csv_file}")
-                try:
-                    for weather_data_list in FileReader.read_csv(csv_file):
-                        logger.info(f"weather_data: {len(weather_data_list)}")
-                        self.insert_weather_data_batch(weather_data_list)
-                    logger.info(f"Successfully processed file: {csv_file}")
-                except Exception as e:
-                    logger.error(f"Error processing file {csv_file}: {e}")
-                
-                finally:
-                    self.connection.commit()
-        except Exception as e:
-            logger.error(f"Error processing data directory: {e}")
-            raise e
-        finally:
-            self.close()
-
-
-
-                
-
+   

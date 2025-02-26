@@ -4,6 +4,9 @@ from typing import List
 from models.weather_data import WeatherData
 from models.pontual_data import VehicleRunData, Itinerary, ItineraryBusstopAssociation, BusOccupation, VehiclerunBusStopoccupation
 from datetime import date, timedelta
+from .database_bus_occupation_service import DatabaseService as DatabaseBusOccupationService
+from .database_weather_service import DatabaseService as DatabaseWeatherService
+
 
 
 class DatabaseService:
@@ -11,7 +14,9 @@ class DatabaseService:
     def __init__(self, 
                  db_config: dict, 
                  start_date: date, 
-                 end_date: date, 
+                 end_date: date,
+                 database_weather_data_service: DatabaseWeatherService,
+                 database_bus_occupation_service: DatabaseBusOccupationService,                 
                  batch_size: int = 1000):        
         if not start_date:
             raise ValueError("start_date is required")
@@ -23,6 +28,10 @@ class DatabaseService:
         self.end_date = end_date        
         self.batch_size = batch_size
         self.db_config = db_config
+        self.database_bus_occupation_service = database_bus_occupation_service
+        self.database_weather_data_service = database_weather_data_service
+        self.database_weather_data_service.load_data()
+ 
 
         self.current_date = start_date
         self.__initialize()
@@ -35,7 +44,11 @@ class DatabaseService:
         self.vehiclerun_bus_stop_ocuppations = []
 
     
-
+    def __reinitialize(self):
+        self.__initialize()
+        self.database_bus_occupation_service.reinitialize()
+        self.close()
+        self.connect()
 
     def connect(self):
         self.connection = psycopg2.connect(**self.db_config)
@@ -120,6 +133,13 @@ class DatabaseService:
                         association,
                         occupation_location
                     )
+                
+                weather_data = self.database_weather_data_service.get_weather_data(vehiclerun_bus_stop_ocuppation.reading_time)
+                if weather_data:
+                    vehiclerun_bus_stop_ocuppation.temperature = weather_data.temperature
+                    vehiclerun_bus_stop_ocuppation.humidity = weather_data.humidity
+                    vehiclerun_bus_stop_ocuppation.wind_speed = weather_data.wind_speed
+                    vehiclerun_bus_stop_ocuppation.precipitation = weather_data.precipitation
             
                 print(f"vehiclerun_bus_stop_ocuppation: {vehiclerun_bus_stop_ocuppation}")
 
@@ -139,6 +159,8 @@ class DatabaseService:
                 self.load_vehiclerun_bus_stop_ocuppation(vehiclerun)
             
             print(f"self.vehiclerun_bus_stop_ocuppations: {len(self.vehiclerun_bus_stop_ocuppations)}")
+            self.database_bus_occupation_service.insert_vehiclerun_busstop_occupation_batch(self.vehiclerun_bus_stop_ocuppations, self.batch_size)            
+            self.__reinitialize()
             # print(f"itinerarys: {len(self.itinerarys)}")
             # print(f"vehicleruns: {vehicleruns}")
             self.current_date += timedelta(days=1)

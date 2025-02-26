@@ -3,18 +3,38 @@ import psycopg2
 from psycopg2.extras import execute_batch
 from typing import List
 from models.weather_data import WeatherData
+from datetime import datetime
 import logging
 from .file_reader import FileReader
+
+
+def average_weather_data(weather_data_list: list[WeatherData]) -> WeatherData: 
+   
+   weather = WeatherData(city="Media")
+  #  average between temperatures
+   weather.temperature = sum(data.temperature for data in weather_data_list) / len(weather_data_list)
+   # average between humidity
+   weather.humidity = sum(data.humidity for data in weather_data_list) / len(weather_data_list)
+   # average between windspeed
+   weather.wind_speed = sum(data.wind_speed for data in weather_data_list) / len(weather_data_list)
+   # average between precipitation
+   weather.precipitation = sum(data.precipitation for data in weather_data_list) / len(weather_data_list)
+   
+   return weather
+
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseService:
+
     def __init__(self, db_config: dict, data_dir: str, batch_size: int = 1000):
         self.db_config = db_config
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.connect()
+        self.weather_data : List[WeatherData] = None
+        
         
 
     def connect(self):
@@ -83,7 +103,39 @@ class DatabaseService:
         self.connection.close()
     def close(self):
         if self.connection:
-            self.connection.close()    
+            self.connection.close()
+
+    def load_data(self):
+        print(f"Loading data from database...")
+        with self.connection.cursor() as cursor:
+            cursor.execute(sql_list_weather_data)
+            self.weather_data = [WeatherData(*row) for row in cursor.fetchall()] 
+
+        print(f"weather_data: {len(self.weather_data)}")
+        print(f"weather_data: {self.weather_data[:5]}")
+
+
+    def get_weather_data(self, start_date: datetime, city: str = None):
+        if (self.weather_data is None):
+            self.load_data()
+        weather_data_list = sorted((wd for wd in self.weather_data if wd.city == city and wd.reading_time <= start_date), key=lambda x: x.reading_time, reverse=True)[:1] if city else sorted((wd for wd in self.weather_data if wd.reading_time <= start_date), key=lambda x: x.reading_time, reverse=True)[:2]
+        weather = None
+        print(f"start_date: {start_date}")
+        print(f"weather_data_list: {weather_data_list}") 
+        if weather_data_list:
+            if len(weather_data_list) > 1:
+                # set average between diferent cities
+                weather = weather_data_list[0] if weather_data_list[0].city is weather_data_list[1].city else average_weather_data(weather_data_list)
+            else:
+                # only set last weather
+                weather = weather_data_list[0]
+        
+        return weather
+
+
+
+        
+    
 
     
     def run(self):
@@ -111,3 +163,34 @@ class DatabaseService:
 
                 
 
+sql_list_weather_data = """
+    SELECT 
+        city, 
+        reading_time, 
+        precipitation, 
+        station_pressure, 
+        max_pressure, 
+        min_pressure,
+        global_radiation,  
+        temperature, 
+        dew_point, 
+        max_temperature, 
+        min_temperature,
+        max_dew_point, 
+        min_dew_point, 
+        max_humidity, 
+        min_humidity, 
+        humidity,
+        wind_direction, 
+        wind_gust,
+        wind_speed
+    FROM 
+        weather_data
+        --weather_data_YEARMONTH
+    WHERE
+        TRUE
+        AND station_pressure IS NOT NULL AND station_pressure <> 0 
+        --AND reading_time BETWEEN %s::DATE AND %s::DATE
+    ORDER BY 
+        reading_time DESC, city
+"""

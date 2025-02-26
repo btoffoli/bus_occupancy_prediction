@@ -1,5 +1,5 @@
 -- migrations/001_create_weather_table.sql
-CREATE TABLE weather_data (
+CREATE TABLE IF NOT EXISTS weather_data (
     id BIGSERIAL,
     city VARCHAR(255) NOT NULL,
     reading_time TIMESTAMPTZ NOT NULL,
@@ -74,6 +74,13 @@ CREATE TABLE IF NOT EXISTS public.vehiclerun_bus_stop_occupation (
     occupation_geo geometry(Point,4326) NOT NULL,
     occupation_location integer NOT NULL,
     normalized_location double precision NOT NULL,
+
+    temperature NUMERIC,
+    humidity NUMERIC,
+    wind_speed NUMERIC,    
+    precipitation NUMERIC,   
+
+
     CONSTRAINT vehiclerunbusstopoccupation_pkey PRIMARY KEY (itinerary_code, scheduled_time, busstop_code)
 ) PARTITION BY RANGE (scheduled_time);
 
