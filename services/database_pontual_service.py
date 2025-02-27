@@ -6,6 +6,9 @@ from models.pontual_data import VehicleRunData, Itinerary, ItineraryBusstopAssoc
 from datetime import date, timedelta
 from .database_bus_occupation_service import DatabaseService as DatabaseBusOccupationService
 from .database_weather_service import DatabaseService as DatabaseWeatherService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -61,13 +64,13 @@ class DatabaseService:
     def load_itinerarys_not_loaded(self, itineray_ids: set[int]):
         # itineray_ids_must_be_loaded = self.itinerarys.keys() - itineray_ids
         itineray_ids_loaded = set(self.itinerarys.keys())
-        print(f"itineray_ids_loaded: {len(itineray_ids_loaded)}")
+        logger.debug(f"itineray_ids_loaded: {len(itineray_ids_loaded)}")
         itineray_ids.difference_update(itineray_ids_loaded)
-        print(f"itineray_ids: {len(itineray_ids)}")
-        print(f"itineray_ids: {list(itineray_ids)[:10]}")
+        logger.debug(f"itineray_ids: {len(itineray_ids)}")
+        logger.debug(f"itineray_ids: {list(itineray_ids)[:10]}")
 
         if not itineray_ids:
-            print("itineray_ids is empty")
+            logger.debug("itineray_ids is empty")
             return
 
         with self.connection.cursor() as cursor:
@@ -87,7 +90,7 @@ class DatabaseService:
                 itinerary.add_itinerary_busstop_association(itinerarys_busstop_association)
 
 
-        print(f"self.itinerarys: {len(self.itinerarys)}\n\n\n\n")
+        logger.debug(f"self.itinerarys: {len(self.itinerarys)}\n\n\n\n")
 
     def load_bus_occupation_of_day(self, day: date, vehicle_ids: set[int]):
         if not vehicle_ids:
@@ -99,18 +102,18 @@ class DatabaseService:
             for i in l:
                 self.bus_occupation.append(BusOccupation(*i))
 
-        print(f"self.bus_occupation: {len(self.bus_occupation)}")
+        logger.debug(f"self.bus_occupation: {len(self.bus_occupation)}")
 
     
     def load_vehiclerun_bus_stop_ocuppation(self, vehiclerun: VehicleRunData):
         # for vehiclerun in self.vehicleruns:
         itinerary = self.itinerarys.get(vehiclerun.itinerary_id)
         if not itinerary:
-            print(f"itinerary not found for vehiclerun: {vehiclerun}")
+            logger.debug(f"itinerary not found for vehiclerun: {vehiclerun}")
             return
 
         if not itinerary.itinerary_busstop_associations:
-            print(f"itinerary_busstop_associations not found for itinerary: {itinerary}")
+            logger.debug(f"itinerary_busstop_associations not found for itinerary: {itinerary}")
             return
         
         
@@ -141,7 +144,7 @@ class DatabaseService:
                     vehiclerun_bus_stop_ocuppation.wind_speed = weather_data.wind_speed
                     vehiclerun_bus_stop_ocuppation.precipitation = weather_data.precipitation
             
-                print(f"vehiclerun_bus_stop_ocuppation: {vehiclerun_bus_stop_ocuppation}")
+                logger.debug(f"vehiclerun_bus_stop_ocuppation: {vehiclerun_bus_stop_ocuppation}")
 
                 self.vehiclerun_bus_stop_ocuppations.append(vehiclerun_bus_stop_ocuppation)
 
@@ -149,20 +152,20 @@ class DatabaseService:
 
     def run(self):
         while self.current_date <= self.end_date:
-            print(f"Processing current_date: {self.current_date}")
+            logger.debug(f"Processing current_date: {self.current_date}")
             vehicleruns = [VehicleRunData(*vr) for vr in self.list_vehiclerun_of_day(self.current_date)]
-            print(f"vehicleruns: {len(vehicleruns)}")
+            logger.debug(f"vehicleruns: {len(vehicleruns)}")
             itinerarys = set(vr.itinerary_id for vr in vehicleruns)
             self.load_itinerarys_not_loaded(itinerarys)
             self.load_bus_occupation_of_day(self.current_date, set(vr.vehicle_id for vr in vehicleruns))
             for vehiclerun in vehicleruns:                
                 self.load_vehiclerun_bus_stop_ocuppation(vehiclerun)
             
-            print(f"self.vehiclerun_bus_stop_ocuppations: {len(self.vehiclerun_bus_stop_ocuppations)}")
+            logger.debug(f"self.vehiclerun_bus_stop_ocuppations: {len(self.vehiclerun_bus_stop_ocuppations)}")
             self.database_bus_occupation_service.insert_vehiclerun_busstop_occupation_batch(self.vehiclerun_bus_stop_ocuppations, self.batch_size)            
             self.__reinitialize()
-            # print(f"itinerarys: {len(self.itinerarys)}")
-            # print(f"vehicleruns: {vehicleruns}")
+            # logger.debug(f"itinerarys: {len(self.itinerarys)}")
+            # logger.debug(f"vehicleruns: {vehicleruns}")
             self.current_date += timedelta(days=1)
             
             

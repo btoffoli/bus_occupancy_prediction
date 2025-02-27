@@ -42,7 +42,7 @@ class DatabaseService:
         
 
     def insert_weather_data_batch(self, weather_data_list: List[WeatherData]):
-        # print(f"weather_data_list: {weather_data_list}")
+        # logger.debug(f"weather_data_list: {weather_data_list}")
         try:
             query = """
             INSERT INTO weather_data (
@@ -83,7 +83,7 @@ class DatabaseService:
                 for wd in weather_data_list
             ]
 
-            print(f"data: {data}")
+            logger.debug(f"data: {data}")
             if not self.connection or self.connection.closed == 1:
                 self.connect()
                 
@@ -93,7 +93,7 @@ class DatabaseService:
                 execute_batch(cursor, query, data)
         except Exception as e:
             self.connection.rollback()
-            print(f"Error inserting data: {e}")
+            logger.debug(f"Error inserting data: {e}")
             raise
         else:
             self.connection.commit()
@@ -106,13 +106,13 @@ class DatabaseService:
             self.connection.close()
 
     def load_data(self):
-        print(f"Loading data from database...")
+        logger.debug(f"Loading data from database...")
         with self.connection.cursor() as cursor:
             cursor.execute(sql_list_weather_data)
             self.weather_data = [WeatherData(*row) for row in cursor.fetchall()] 
 
-        print(f"weather_data: {len(self.weather_data)}")
-        print(f"weather_data: {self.weather_data[:5]}")
+        logger.debug(f"weather_data: {len(self.weather_data)}")
+        logger.debug(f"weather_data: {self.weather_data[:5]}")
 
 
     def get_weather_data(self, start_date: datetime, city: str = None):
@@ -120,8 +120,8 @@ class DatabaseService:
             self.load_data()
         weather_data_list = sorted((wd for wd in self.weather_data if wd.city == city and wd.reading_time <= start_date), key=lambda x: x.reading_time, reverse=True)[:1] if city else sorted((wd for wd in self.weather_data if wd.reading_time <= start_date), key=lambda x: x.reading_time, reverse=True)[:2]
         weather = None
-        print(f"start_date: {start_date}")
-        print(f"weather_data_list: {weather_data_list}") 
+        logger.debug(f"start_date: {start_date}")
+        logger.debug(f"weather_data_list: {len(weather_data_list)}") 
         if weather_data_list:
             if len(weather_data_list) > 1:
                 # set average between diferent cities
