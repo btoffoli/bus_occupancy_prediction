@@ -91,7 +91,7 @@ def main():
         }
         print(f"db_config: {db_config}")
 
-        data_base_occupation_service = DatabaseServiceBusOccupation(db_config)
+        data_base_occupation_service = DatabaseServiceBusOccupation(f'{os.getcwd()}/data/vehicle_bus_stop_occupation_{args.start_date.strftime("%Y%m%d")}_{args.end_date.strftime("%Y%m%d")}.csv')
         
         db_service = DatabaseServicePontual(db_config, args.start_date, args.end_date, db_weather_service, data_base_occupation_service)
         db_service.run()

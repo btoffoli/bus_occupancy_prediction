@@ -11,3 +11,5 @@ images/
 inmet*
 var
 .env
+data/
+unsloth_compiled_cache/

@@ -48,8 +48,7 @@ class DatabaseService:
 
     
     def __reinitialize(self):
-        self.__initialize()
-        self.database_bus_occupation_service.reinitialize()
+        self.__initialize()        
         self.close()
         self.connect()
 
@@ -106,6 +105,7 @@ class DatabaseService:
 
     
     def load_vehiclerun_bus_stop_ocuppation(self, vehiclerun: VehicleRunData):
+        resp = []
         # for vehiclerun in self.vehicleruns:
         itinerary = self.itinerarys.get(vehiclerun.itinerary_id)
         if not itinerary:
@@ -146,7 +146,11 @@ class DatabaseService:
             
                 logger.debug(f"vehiclerun_bus_stop_ocuppation: {vehiclerun_bus_stop_ocuppation}")
 
-                self.vehiclerun_bus_stop_ocuppations.append(vehiclerun_bus_stop_ocuppation)
+                resp.append(vehiclerun_bus_stop_ocuppation)
+
+            self.vehiclerun_bus_stop_ocuppations.extend(resp)
+
+            return resp
 
         
 
@@ -159,10 +163,16 @@ class DatabaseService:
             self.load_itinerarys_not_loaded(itinerarys)
             self.load_bus_occupation_of_day(self.current_date, set(vr.vehicle_id for vr in vehicleruns))
             for vehiclerun in vehicleruns:                
-                self.load_vehiclerun_bus_stop_ocuppation(vehiclerun)
+                partial_vehiclerun_bus_stop_ocuppation = self.load_vehiclerun_bus_stop_ocuppation(vehiclerun)
+                if partial_vehiclerun_bus_stop_ocuppation:
+                    self.database_bus_occupation_service.insert_vehiclerun_busstop_occupation_batch(partial_vehiclerun_bus_stop_ocuppation)
+                    self.vehiclerun_bus_stop_ocuppations.extend(partial_vehiclerun_bus_stop_ocuppation)
             
             logger.debug(f"self.vehiclerun_bus_stop_ocuppations: {len(self.vehiclerun_bus_stop_ocuppations)}")
-            self.database_bus_occupation_service.insert_vehiclerun_busstop_occupation_batch(self.vehiclerun_bus_stop_ocuppations, self.batch_size)            
+            
+            # self.database_bus_occupation_service.insert_vehiclerun_busstop_occupation_batch(self.vehiclerun_bus_stop_ocuppations, self.batch_size)            
+
+
             self.__reinitialize()
             # logger.debug(f"itinerarys: {len(self.itinerarys)}")
             # logger.debug(f"vehicleruns: {vehicleruns}")
@@ -189,7 +199,10 @@ FROM
 WHERE
 	TRUE	
 	AND vr.scheduledtime BETWEEN %s::DATE AND %s::DATE
+    AND vr.tripstarttime IS NOT NULL
+    AND vr.tripcompletiontime IS NOT NULL
 	AND vr.status = 5
+    AND vr.itineraryobservance = 'FULL'
 """
 
 sql_list_itinerarys = """

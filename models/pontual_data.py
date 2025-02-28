@@ -180,6 +180,10 @@ class VehiclerunBusStopoccupation:
         self.occupation_geo = bus_occupation.geo
         self.occupation_location = occupation_location
         self.normalized_location = self.bustop_location / self.itinerary_size
+        self.temperature = None
+        self.humidity = None
+        self.wind_speed = None
+        self.precipitation = None
 
     def to_dict(self):
         return {
@@ -193,7 +197,7 @@ class VehiclerunBusStopoccupation:
             'bustop_location': self.bustop_location,
             'reading_time': self.reading_time.isoformat(),  # Convert datetime to string
             'occupation': self.occupation,
-            'occupation_geo': self.occupation_geo.wkt,  # Convert Point to Well-Known Text format
+            # 'occupation_geo': self.occupation_geo.wkt,  # Convert Point to Well-Known Text format
             'occupation_location': self.occupation_location,
             'normalized_location': self.normalized_location,
             'temperature': self.temperature,
@@ -202,6 +206,7 @@ class VehiclerunBusStopoccupation:
             'precipitation': self.precipitation
         
         }
+    
 
 
 
