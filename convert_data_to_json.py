@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 from datetime import datetime
+import argparse
 
 
 # exemplo
@@ -9,7 +10,7 @@ human_speaks = "Sabendo que está %clima_tempo e a temperatura é %temperatura. 
 
 #exemplo
 # bot_speaks = "O ponto 2333243 da linha 507I, que corresponde ao percentual 34% do itinerario, a lotação é %lotação"
-bot_speaks = "O ponto %ponto da linha %linha, que corresponde ao percentual %percentual do itinerario, a lotação é %lotação"
+bot_speaks = "O ponto %ponto da linha %linha, que corresponde ao percentual %percentual do itinerario, a lotação é %lotação."
 
 days_of_week = {
     0: "domingo",
@@ -30,7 +31,7 @@ def convert_to_dict(
         humidade: float,
         temperatura: float
       ):
-  clima_tempo = 'Chovendo' if humidade > 96 else 'Ensolarado'
+  clima_tempo = 'Chovendo' if humidade > 97 else 'Nublado' if humidade > 90 else 'Ensolarado'
     
   day_of_week = horario.weekday()
   dia = days_of_week[day_of_week]
@@ -54,9 +55,15 @@ def convert_to_dict(
   .replace("%percentual", str(percentual))
 
   return {
-      "human": human_says,
-      "bot": bot_says
+    'instruction': human_says,
+    'input': '',
+    'output': bot_says,        
   }
+
+  # return {
+  #     "human": human_says,
+  #     "bot": bot_says
+  # }
 
 
     
@@ -85,6 +92,12 @@ def convert_to_text(
 
 
 if __name__ == '__main__':
+    parse = argparse.ArgumentParser()
+    parse.add_argument('--file', type=str, help='Nome arquivo de saida')
+    args = parse.parse_args()
+    print(f"args: {args}")
+
+
     # Load the CSV file into a pandas DataFrame
     df = pd.read_csv('data/vehicle_bus_stop_occupation_20250101_20250201-copy.csv')
     print(df.columns)
@@ -92,15 +105,28 @@ if __name__ == '__main__':
 
     print(df.head())
     print(df['temperature'][10])
-    for i in range(2):
-       linha = df['itinerary_code'][i]
-       ponto = df['busstop_code'][i]
-       horario = datetime.fromisoformat(df['reading_time'][i])
-       nivel_lotacao = df['occupation'][i]
-       percentual = 100 * df['normalized_location'][i]
-       humidade = df['humidity'][i]
-       temperatura = df['temperature'][i]
-       print(convert_to_text(linha, ponto, horario, nivel_lotacao, percentual, humidade, temperatura))
+    with open(args.file, 'w') as f:
+      conversations = []  
+      for i, row in df.iterrows():
+        linha = row['itinerary_code']
+        ponto = row['busstop_code']
+        horario = datetime.fromisoformat(row['reading_time'])
+        nivel_lotacao = row['occupation']
+        percentual = 100 * row['normalized_location']
+        humidade = row['humidity']
+        temperatura = row['temperature']
+        # conversations.append(convert_to_dict(linha, ponto, horario, nivel_lotacao, percentual, humidade, temperatura))
+        conversation = convert_to_dict(linha, ponto, horario, nivel_lotacao, percentual, humidade, temperatura)
+        json.dump(conversation, f)
+        f.write('\n')
+        f.flush()
+
+      
+      
+      # f.write(json.dumps(conversations).encode('utf-8').decode('utf-8'))
+      # f.write('\n')
+      # f.flush()
+
 
 
 
