@@ -13,3 +13,4 @@ var
 .env
 data/
 unsloth_compiled_cache/
+.ipynb_checkpoints
