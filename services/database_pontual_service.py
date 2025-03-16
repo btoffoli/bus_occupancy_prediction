@@ -7,10 +7,14 @@ from datetime import date, timedelta
 from .database_bus_occupation_service import DatabaseService as DatabaseBusOccupationService
 from .database_weather_service import DatabaseService as DatabaseWeatherService
 import logging
+from pyproj import Transformer
+from shapely.geometry import LineString, Point
+
 
 logger = logging.getLogger(__name__)
 
-
+# Define the coordinate transformation from WGS84 to UTM zone 24S, 
+transformer = Transformer.from_crs("EPSG:4326", "EPSG:32724", always_xy=True)
 
 class DatabaseService:
 
@@ -25,7 +29,7 @@ class DatabaseService:
             raise ValueError("start_date is required")
         if not end_date:
             raise ValueError("end_date is required")
-        if end_date <= start_date:
+        if end_date < start_date:
             raise ValueError("end_date must be greater than start_date")        
         self.start_date = start_date            
         self.end_date = end_date        
@@ -116,14 +120,17 @@ class DatabaseService:
             logger.debug(f"itinerary_busstop_associations not found for itinerary: {itinerary}")
             return
         
-        
+        transformed_itinerary = LineString([transformer.transform(x, y) for x, y in itinerary.geo.coords])
         reversed_bus_occupation = sorted(filter(lambda x: x.vehicle_id == vehiclerun.vehicle_id and x.reading_time >= vehiclerun.tripstarttime and x.reading_time < vehiclerun.tripcompletiontime, self.bus_occupation), key=lambda x: x.reading_time, reverse=True)
         for association in itinerary.itinerary_busstop_associations:
+            bus_stop_location = association.location
+
             # find last bus ocuppation before bus stop in current association
             last_bus_occupation, occupation_location = None, None
             for bus_occupation in reversed_bus_occupation:
-                occupation_location = itinerary.geo.project(bus_occupation.geo)
-                if occupation_location < association.location:
+                transformed_bus_occupation_point = Point([transformer.transform(x, y) for x, y in bus_occupation.geo.coords])
+                occupation_location = transformed_itinerary.project(transformed_bus_occupation_point)                
+                if occupation_location < bus_stop_location:
                     last_bus_occupation = bus_occupation
                     break
 
@@ -150,7 +157,7 @@ class DatabaseService:
 
             self.vehiclerun_bus_stop_ocuppations.extend(resp)
 
-            return resp
+        return resp
 
         
 
