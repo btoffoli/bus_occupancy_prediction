@@ -10,7 +10,7 @@ import torch
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import os
 
-max_seq_length_param = 512
+max_seq_length_param = 4096
 # mlname = 'unsloth/llama-3-8b-bnb-4bit'  # Teste também com "meta-llama/Llama-3-8B"
 mlname = "unsloth/mistral-7b-v0.3-bnb-4bit"
 

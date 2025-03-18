@@ -3,12 +3,16 @@ from psycopg2.extras import execute_batch
 from typing import List
 from models.weather_data import WeatherData
 from models.pontual_data import VehicleRunData, Itinerary, ItineraryBusstopAssociation, BusOccupation, VehiclerunBusStopoccupation
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from .database_bus_occupation_service import DatabaseService as DatabaseBusOccupationService
 from .database_weather_service import DatabaseService as DatabaseWeatherService
 import logging
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
+from .utils import read_last_line
+
+
+
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +27,8 @@ class DatabaseService:
                  start_date: date, 
                  end_date: date,
                  database_weather_data_service: DatabaseWeatherService,
-                 database_bus_occupation_service: DatabaseBusOccupationService,                 
+                 database_bus_occupation_service: DatabaseBusOccupationService,
+                 file_path: str,                 
                  batch_size: int = 1000):        
         if not start_date:
             raise ValueError("start_date is required")
@@ -38,9 +43,17 @@ class DatabaseService:
         self.database_bus_occupation_service = database_bus_occupation_service
         self.database_weather_data_service = database_weather_data_service
         self.database_weather_data_service.load_data()
- 
 
-        self.current_date = start_date
+        last_line = read_last_line(file_path)
+        if last_line is not None:
+            self.current_scheduled_time =  datetime.fromisoformat(last_line['scheduled_time'])
+            self.current_itinerary_code = last_line['itinerary_code']
+            self.current_date = self.current_scheduled_time.date()
+        else:
+            self.current_date = start_date
+            self.current_scheduled_time = None
+            self.current_itinerary_code = None
+        
         self.__initialize()
         self.connect()
 
@@ -166,10 +179,21 @@ class DatabaseService:
             logger.debug(f"Processing current_date: {self.current_date}")
             vehicleruns = [VehicleRunData(*vr) for vr in self.list_vehiclerun_of_day(self.current_date)]
             logger.debug(f"vehicleruns: {len(vehicleruns)}")
-            itinerarys = set(vr.itinerary_id for vr in vehicleruns)
+            sorted_vehicleruns = sorted(vehicleruns, key=lambda x: (x.itinerary_code, x.scheduledtime))
+            print(f"sorted_vehicleruns: {[i.itinerary_code for i in sorted_vehicleruns[:10]]}")
+           
+            itinerarys = set(vr.itinerary_id for vr in sorted_vehicleruns)
             self.load_itinerarys_not_loaded(itinerarys)
             self.load_bus_occupation_of_day(self.current_date, set(vr.vehicle_id for vr in vehicleruns))
-            for vehiclerun in vehicleruns:                
+            for vehiclerun in vehicleruns:
+                
+                if self.current_scheduled_time and self.current_itinerary_code:
+                    vechiclerun_itinerary_code = self.itinerarys[vehiclerun.itinerary_id].code
+                    if vechiclerun_itinerary_code <= self.current_itinerary_code\
+                        and vehiclerun.scheduledtime <= self.current_scheduled_time:
+                        print(f"Pulando itinerario {vechiclerun_itinerary_code} - agendado: {vehiclerun.scheduledtime} - atual: {self.current_scheduled_time}")
+                        continue
+                
                 partial_vehiclerun_bus_stop_ocuppation = self.load_vehiclerun_bus_stop_ocuppation(vehiclerun)
                 if partial_vehiclerun_bus_stop_ocuppation:
                     self.database_bus_occupation_service.insert_vehiclerun_busstop_occupation_batch(partial_vehiclerun_bus_stop_ocuppation)
@@ -197,12 +221,15 @@ class DatabaseService:
 sql_list_vehiclerun_of_day = """
     SELECT
 	vr.forwarditinerary_oid itinerary_id,
+    i.codigo itinerary_code,
 	vr.scheduledtime,
 	vr.tripstarttime,
 	vr.tripcompletiontime,
 	vr.vehicletranscol_oid vehicle_id
 FROM
 	transcol.vehiclerun_YEARMONTH vr
+    JOIN pontual.itinerario i
+        ON i.id = vr.forwarditinerary_oid
 WHERE
 	TRUE	
 	AND vr.scheduledtime BETWEEN %s::DATE AND %s::DATE
