@@ -91,9 +91,13 @@ def main():
         }
         print(f"db_config: {db_config}")
 
-        data_base_occupation_service = DatabaseServiceBusOccupation(f'{os.getcwd()}/data/vehicle_bus_stop_occupation_{args.start_date.strftime("%Y%m%d")}_{args.end_date.strftime("%Y%m%d")}.csv')
+        file_path = f'{os.getcwd()}/data/vehicle_bus_stop_occupation_{args.start_date.strftime("%Y%m%d")}_{args.end_date.strftime("%Y%m%d")}.csv'
+        print(f"file_path: {file_path}")
+
+
+        data_base_occupation_service = DatabaseServiceBusOccupation(file_path=file_path)
         
-        db_service = DatabaseServicePontual(db_config, args.start_date, args.end_date, db_weather_service, data_base_occupation_service)
+        db_service = DatabaseServicePontual(db_config, args.start_date, args.end_date, db_weather_service, data_base_occupation_service, file_path)
         db_service.run()
         
     elif args.mode == 'inmet':

@@ -6,13 +6,15 @@ from shapely import LineString, Point, wkb, from_wkt
 @dataclass
 class VehicleRunData:
     itinerary_id: int
+    itinerary_code: str
     scheduledtime: datetime
     tripstarttime: datetime
     tripcompletiontime: datetime
     vehicle_id: int
 
-    def __init__(self, itinerary_id, scheduledtime, tripstarttime, tripcompletiontime, vehicle_id):
+    def __init__(self, itinerary_id, itinerary_code, scheduledtime, tripstarttime, tripcompletiontime, vehicle_id):
         self.itinerary_id = itinerary_id
+        self.itinerary_code = itinerary_code
         self.scheduledtime = scheduledtime
         self.tripstarttime = tripstarttime
         self.tripcompletiontime = tripcompletiontime

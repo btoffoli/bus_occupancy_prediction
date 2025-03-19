@@ -1,3 +1,4 @@
+# %%
 from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -12,7 +13,8 @@ import os
 
 max_seq_length_param = 4096
 # mlname = 'unsloth/llama-3-8b-bnb-4bit'  # Teste também com "meta-llama/Llama-3-8B"
-mlname = "unsloth/mistral-7b-v0.3-bnb-4bit"
+# mlname = "unsloth/mistral-7b-v0.3-bnb-4bit"
+mlname = 'unsloth/Meta-Llama-3.1-8B-bnb-4bit'
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Força uso da GPU 0
@@ -85,3 +87,5 @@ if __name__ == '__main__':
     tokenizer.save_pretrained(os.path.join(os.getcwd(), 'weight_models_sft'))
 
 
+
+# %%

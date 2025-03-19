@@ -2,6 +2,9 @@ import re
 import argparse
 
 from datetime import datetime, date
+import pandas as pd
+import os
+
 
 
 
@@ -18,12 +21,24 @@ def extract_city(filename: str) -> str:
   return match.group(1) if match else None
 
 def valid_date(date_str) -> date:
-    try:
-        return datetime.strptime(date_str, "%Y-%m-%d").date()
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"Invalid date format: {date_str}. Use YYYY-MM-DD.")
+  try:
+      return datetime.strptime(date_str, "%Y-%m-%d").date()
+  except ValueError:
+      raise argparse.ArgumentTypeError(f"Invalid date format: {date_str}. Use YYYY-MM-DD.")
 
 
+def read_last_line(file_path):
+  # Check until data was stored
+  if os.path.exists(file_path):
+    # Lê o arquivo CSV inteiro
+    df = pd.read_csv(file_path)
+
+    # Seleciona a última linha
+    last_line = df.iloc[-1]
+
+    return last_line
+  
+  return None
    
 
 if __name__ == '__main__':
