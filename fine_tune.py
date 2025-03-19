@@ -9,6 +9,12 @@ from trl import SFTTrainer
 import torch
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import os
+from dotenv import load_dotenv
+import argparse
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 
 class BusOccupancyFineTune:
@@ -40,14 +46,15 @@ class BusOccupancyFineTune:
             bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
             bnb_4bit_quant_type=bnb_4bit_quant_type,
             bnb_4bit_use_double_quant=bnb_4bit_use_double_quant,
-            bnb_4bit_quant_storage=
+            # bnb_4bit_quant_storage=
         )
 
         self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
+            model_name,
             quantization_config=quantization_config,
-            device_map="auto"
-            max_memory=torch.cuda.get_device_properties(0).total_memory
+            device_map="auto",
+            # max_memory=torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else None,
+            max_memory={0: "5GB"},  # Ajuste crítico
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -100,22 +107,68 @@ class BusOccupancyFineTune:
         self.train()
     
 
-    def load_model(self):
-        self.model = AutoModelForCausalLM.from_pretrained(
-            
+    def load_trained_model(self, path):
+        self.model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path=path)
+        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=path)
+        self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def predict(self, text):
         inputs = self.tokenizer(text, return_tensors="pt")
         outputs = self.model.generate(**inputs, max_new_tokens=50)
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-        
-
-
-        
+    
 
 
+    def predict(self, text):
+        inputs = self.tokenizer(text, return_tensors="pt")
+        outputs = self.model.generate(**inputs, max_new_tokens=50)
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
 
 
-        
-        pass
+if __name__ == 'main':
+    load_dotenv(override=True)
+    argparser = argparse.ArgumentParser()
+    argparse.add_argument('--mode', type=str, default=os.getenv('MODE', 'fine_tune'), choices=['fine_tune', 'predict'])
+
+
+    # argparser.add_argument('--model_name', type=str, default=os.getenv('MODEL_NAME', 'unsloth/Meta-Llama-3.1-8B-bnb-4bit'))
+    argparser.add_argument('--datasets_path', type=str, default=os.getenv('DATASETS_PATH', './data'))
+    argparser.add_argument('--max_length', type=int, default=int(os.getenv('MAX_LENGTH', 4096)))
+    argparser.add_argument('--batch_size', type=int, default=int(os.getenv('BATCH_SIZE', 2)))
+    argparser.add_argument('--learning_rate', type=float, default=float(os.getenv('LEARNING_RATE', 2e-5)))
+    argparser.add_argument('--num_epochs', type=int, default=int(os.getenv('NUM_EPOCHS', 3)))
+    argparser.add_argument('--output_dir', type=str, default=os.getenv('OUTPUT_DIR', './results'))
+    argparser.add_argument('--load_in_4bit', type=bool, default=os.getenv('LOAD_IN_4BIT', True))
+    argparser.add_argument('--bnb_4bit_compute_dtype', type=str, default=os.getenv('BNB_4BIT_COMPUTE_DTYPE', 'float16'))
+    argparser.add_argument('--bnb_4bit_quant_type', type=str, default=os.getenv('BNB_4BIT_QUANT_TYPE', 'nf4'))
+    argparser.add_argument('--bnb_4bit_use_double_quant', type=bool, default=os.getenv('BNB_4BIT_USE_DOUBLE_QUANT', True))
+
+    args = argparser.parse_args()
+
+    if args.mode == 'fine_tune':
+        bus_occupancy_fine_tune = BusOccupancyFineTune(
+            model_name=args.model_name,
+            datasets_path=args.datasets,
+            max_length=args.max_length,
+            batch_size=args.batch_size,
+            learning_rate=args.learning,
+            num_epochs=args.num_epochs,
+            output_dir=args.output_dir,
+            load_in_4bit=args.load_in_4bit,
+            bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
+            bnb_4bit_quant_type=args.bnb_4bit_quant_type,
+            bnb_4bit_use_double_quant=args.bnb_4bit_use_double_quant
+        )
+        bus_occupancy_fine_tune.run()
+    elif args.mode == 'predict':
+        bus_occupancy_fine_tune = BusOccupancyFineTune()
+        bus_occupancy_fine_tune.load_trained_model(path=args.output_dir)
+        text = input("Enter your text: ")
+        logger.debug(bus_occupancy_fine_tune.predict(text))
+ 
+
+
+
+
+    
