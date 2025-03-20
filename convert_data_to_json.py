@@ -99,7 +99,7 @@ if __name__ == '__main__':
 
 
     # Load the CSV file into a pandas DataFrame
-    df = pd.read_csv('data/vehicle_bus_stop_occupation_20250101_20250201-copy.csv')
+    df = pd.read_csv('data/vehicle_bus_stop_occupation_20231101_20231201.csv')
     print(df.columns)
     print(df.dtypes)
 
