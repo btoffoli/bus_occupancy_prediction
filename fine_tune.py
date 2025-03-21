@@ -149,112 +149,257 @@ class BusOccupancyFineTune:
         self.datasets_path = kwargs.get("datasets_path", "./data")
         self.output_dir = kwargs.get("output_dir", output_default_dir)
         self.data_batch_size = kwargs.get("data_batch_size", 1000)  # New parameter for data batch size
+
+        if mode in ['predict', 'fine_tune']:
+            self.__load_config()
         
         if mode == 'predict':
-            self.load_trained_model()
+            self.__load_trained_model()
 
         elif mode == 'fine_tune':
+            self.__load_model_for_training()
             
-            self.max_length = kwargs.get("max_length", 128)
-            self.batch_size = kwargs.get("batch_size", 16)
-            self.learning_rate = kwargs.get("learning_rate", 2e-5)
-            self.num_epochs = kwargs.get("num_epochs", 3) 
-            load_in_4bit = kwargs.get("load_in_4bit", False)
-            bnb_4bit_compute_dtype = kwargs.get("bnb_4bit_compute_dtype", "float16")
-            bnb_4bit_quant_type = kwargs.get("bnb_4bit_quant_type", "nf4")
-            bnb_4bit_use_double_quant = kwargs.get("bnb_4bit_use_double_quant", True)
-
-            # quantization_config = BitsAndBytesConfig(
-            #     load_in_4bit=load_in_4bit,
-            #     bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
-            #     bnb_4bit_quant_type=bnb_4bit_quant_type,
-            #     bnb_4bit_use_double_quant=bnb_4bit_use_double_quant,
-            # )
-
-            # quantization_config = BitsAndBytesConfig(
-            #     load_in_4bit=True,
-            #     bnb_4bit_use_double_quant=True,
-            #     bnb_4bit_quant_type="nf4",
-            #     bnb_4bit_compute_dtype=torch.bfloat16,
-            #     llm_int8_enable_fp32_cpu_offload=True
-            # )
-
-            quantization_config = BitsAndBytesConfig(
-                load_in_8bit=True,
-                llm_int8_enable_fp32_cpu_offload=True
+            
+    
+    def train(self):
+        if self.data_batch_size:
+            for batch in self.read_datasets_in_batches():
+                self.trainer = SFTTrainer(
+                    model=self.model,
+                    tokenizer=self.tokenizer,
+                    args=self.training_args,
+                    train_dataset=batch
+                )
+                self.trainer.train()
+        else:
+            ds = load_dataset(
+                path=self.datasets_path,
+                data_files=['occupancy-events-20240301.converted.txt'],
+                split="train"
             )
+            # Falta converter com preprocess_data
+            #linha 66 do fine_tunex.py
 
-            device_map = {
-                "model.embed_tokens": 0,
-                "model.layers.0": 0,
-                "model.layers.1": 0,
-                # ... Add more layers to GPU (device 0) as your memory allows
-                "model.layers.2": "cpu",
-                "model.layers.3": "cpu",
-                # ... Put remaining layers on CPU
-                "model.norm": 0,
-                "lm_head": 0
-            }
-
-            print(f"self.model_name: {self.model_name}")
-
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                quantization_config=quantization_config,
-                device_map=device_map
-                # device_map="auto",
-                # max_memory=torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else None,
-                # max_memory={0: "2GB"},  # Critical adjustment
+            self.trainer = SFTTrainer(
+                model=self.model,
+                tokenizer=self.tokenizer,
+                args=self.training_args,
+                train_dataset=self.train_dataset,
             )
+            self.trainer.train()
 
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+        
 
-            peft_config = LoraConfig(
-                r=8,
-                lora_alpha=8,
-                target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-                lora_dropout=0.1,
-                bias="none",
-            )
+        self.model.save_pretrained(os.path.join(os.getcwd(), self.output_dir))
+        self.tokenizer.save_pretrained(os.path.join(os.getcwd(), self.output_dir))
+        
+    def __load_config(self):        
+            if self.model_name == 'microsoft/phi-2':
+                self.quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.float16,  # Using float16 for memory efficiency
+                )
 
-            self.model = prepare_model_for_kbit_training(self.model)
-            self.model = get_peft_model(self.model, peft_config)
+                self.peft_config = LoraConfig(
+                    r=2,  # Minimal rank
+                    lora_alpha=16,
+                    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+                    lora_dropout=0.0,  # No dropout to save memory
+                    bias="none",
+                )            
+            elif self.model_name == 'unsloth/mistral-7b-v0.3-bnb-4bit':
+                self.quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                )
+                            # Preparação PEFT
+                self.peft_config = LoraConfig(
+                    r=8,
+                    lora_alpha=8,
+                    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+                    lora_dropout=0.1,
+                    bias="none",
+                )
+            elif self.model_name == 'TinyLlama/TinyLlama-1.1B-Chat-v1.0':
+                self.quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.float16,  # Using float16 for memory efficiency
+                )
 
+                self.peft_config = LoraConfig(
+                    r=2,  # Minimal rank
+                    lora_alpha=16,
+                    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+                    lora_dropout=0.0,  # No dropout to save memory
+                    bias="none",
+                )
+                        
+            else:
+                logger.warning("Unknown model name supported...")
+
+
+    
+                
+            
+
+           
+        
+
+    def run(self):
+        self.train()
+
+    def __load_training_args(self):
+        if self.model_name == 'microsoft/phi-2':
             self.training_args = TrainingArguments(
-                per_device_train_batch_size=self.batch_size,
+                per_device_train_batch_size=1,  # Minimal batch size
+                gradient_accumulation_steps=8,  # Reduced to save memory during accumulation
+                gradient_checkpointing_kwargs={"use_reentrant": False},  # More stable checkpointing
+                warmup_steps=2,  # Minimal warmup
+                max_steps=40,  # Reduced steps
+                fp16=True,  # Force fp16
+                bf16=False,  # Disable bf16
+                logging_steps=1,
+                output_dir='./logs',
+                optim='adamw_8bit',  # 8-bit optimizer
+                learning_rate=5e-5,  # Lower learning rate
+                weight_decay=0.0,  # No weight decay to save computation
+                lr_scheduler_type='constant',  # Simpler scheduler
+                seed=3047,
+                # Memory optimizations
+                gradient_checkpointing=True,  # Enable gradient checkpointing
+                torch_compile=False,  # Disable torch compile
+                dataloader_drop_last=True,  # Drop incomplete batches
+                dataloader_num_workers=0,  # No parallel data loading
+                ddp_find_unused_parameters=False,
+                report_to="none",  # Disable reporting
+            )
+
+            
+        elif self.model_name == 'unsloth/mistral-7b-v0.3-bnb-4bit':
+            self.training_args = TrainingArguments(
+                per_device_train_batch_size=2,
                 gradient_accumulation_steps=4,
                 warmup_steps=10,
                 max_steps=60,
                 fp16=not torch.cuda.is_bf16_supported(),
                 bf16=torch.cuda.is_bf16_supported(),
                 logging_steps=1,
-                output_dir=self.output_dir,
+                output_dir='./logs',
                 optim='adamw_8bit',
                 weight_decay=0.01,
                 lr_scheduler_type='linear',
                 seed=3047
             )
 
-    
-    def train(self):
-        for batch in self.read_datasets_in_batches():
-            self.trainer = SFTTrainer(
-                model=self.model,
-                tokenizer=self.tokenizer,
-                args=self.training_args,
-                train_dataset=batch
+        elif self.model_name == 'TinyLlama/TinyLlama-1.1B-Chat-v1.0':
+            self.training_args = TrainingArguments(
+                per_device_train_batch_size=1,  # Minimal batch size
+                gradient_accumulation_steps=8,  # Reduced to save memory during accumulation
+                gradient_checkpointing_kwargs={"use_reentrant": False},  # More stable checkpointing
+                warmup_steps=2,  # Minimal warmup
+                max_steps=40,  # Reduced steps
+                fp16=True,  # Force fp16
+                bf16=False,  # Disable bf16
+                logging_steps=1,
+                output_dir='./logs',
+                optim='adamw_8bit',  # 8-bit optimizer
+                learning_rate=5e-5,  # Lower learning rate
+                weight_decay=0.0,  # No weight decay to save computation
+                lr_scheduler_type='constant',  # Simpler scheduler
+                seed=3047,
+                # Memory optimizations
+                gradient_checkpointing=True,  # Enable gradient checkpointing
+                torch_compile=False,  # Disable torch compile
+                dataloader_drop_last=True,  # Drop incomplete batches
+                dataloader_num_workers=0,  # No parallel data loading
+                ddp_find_unused_parameters=False,
+                report_to="none",  # Disable reporting
             )
-            self.trainer.train()
+        else:
+            logger.warning("Unknown model name supported...")
+            self.training_args = None
+            
+
+    def __load_model_for_training(self, **kwargs):
+        self.max_length = kwargs.get("max_length", 128)
+        self.batch_size = kwargs.get("batch_size", 16)
+        self.learning_rate = kwargs.get("learning_rate", 2e-5)
+        self.num_epochs = kwargs.get("num_epochs", 3) 
+        load_in_4bit = kwargs.get("load_in_4bit", False)
+        bnb_4bit_compute_dtype = kwargs.get("bnb_4bit_compute_dtype", "float16")
+        bnb_4bit_quant_type = kwargs.get("bnb_4bit_quant_type", "nf4")
+        bnb_4bit_use_double_quant = kwargs.get("bnb_4bit_use_double_quant", True)
+
+        # quantization_config = BitsAndBytesConfig(
+        #     load_in_4bit=load_in_4bit,
+        #     bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
+        #     bnb_4bit_quant_type=bnb_4bit_quant_type,
+        #     bnb_4bit_use_double_quant=bnb_4bit_use_double_quant,
+        # )
+
+        # quantization_config = BitsAndBytesConfig(
+        #     load_in_4bit=True,
+        #     bnb_4bit_use_double_quant=True,
+        #     bnb_4bit_quant_type="nf4",
+        #     bnb_4bit_compute_dtype=torch.bfloat16,
+        #     llm_int8_enable_fp32_cpu_offload=True
+        # )
+
+        # quantization_config = BitsAndBytesConfig(
+        #     load_in_8bit=True,
+        #     llm_int8_enable_fp32_cpu_offload=True
+        # )
+
+        device_map = {
+            "model.embed_tokens": 0,
+            "model.layers.0": 0,
+            "model.layers.1": 0,
+            # ... Add more layers to GPU (device 0) as your memory allows
+            "model.layers.2": "cpu",
+            "model.layers.3": "cpu",
+            # ... Put remaining layers on CPU
+            "model.norm": 0,
+            "lm_head": 0
+        }
+
+        logger.info(f"self.model_name: {self.model_name}")
+
+        self.model = AutoModelForCausalLM.from_pretrained(
+            self.model_name,
+            quantization_config=self.quantization_config,
+            device_map=device_map
+            # device_map="auto",
+            # max_memory=torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else None,
+            # max_memory={0: "2GB"},  # Critical adjustment
+        )
+
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        # peft_config = LoraConfig(
+        #     r=8,
+        #     lora_alpha=8,
+        #     target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+        #     lora_dropout=0.1,
+        #     bias="none",
+        # )
+
+        self.model = prepare_model_for_kbit_training(self.model)
+        self.model = get_peft_model(self.model, self.peft_config)
+        self.model.print_trainable_parameters()
+
         
 
-        self.model.save_pretrained(os.path.join(os.getcwd(), self.output_dir))
-        self.tokenizer.save_pretrained(os.path.join(os.getcwd(), self.output_dir))
+     
 
-    def run(self):
-        self.train()
 
-    def load_trained_model(self):
+    def __load_fine_tuned_model(self):
         self.model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path=self.output_dir)
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=self.output_dir)
         self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -316,42 +461,16 @@ class BusOccupancyFineTune:
 
 
 
-                    # for start in range(0, len(df), self.data_batch_size):
-                    #     # batch_to_train = df[start:start + self.data_batch_size]
-                    #     batch_to_train = df.loc[start:start + self.data_batch_size]
-
-                    #     logger.debug(f"Batch type: {type(batch_to_train['tripScheduledTime'])}")
-
-                    #     l = [convert_to_text(r) for r in  batch_to_train]
-
-                    #     yield l
-
-
-                        
-
-                        
-                        # yield batch_to_train
-                        # logger.trace(f"Batch: \n{batch_to_train[0:10]}")
-                        
-                        # text = convert_to_text(
-                        #     batch_to_train['tripRouteId'],
-                        #     batch_to_train['busStopId'],
-                        #     batch_to_train['readingTime'],
-                        #     batch_to_train['occupation'],
-                        #     batch_to_train['normalizedLocation'],
-                        #     batch_to_train['humidity'],
-                        #     batch_to_train['temperature']
-                        # )
-                        # yield text
-
-
-
-
 if __name__ == '__main__':
     load_dotenv(override=True)
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--mode', type=str, default=os.getenv('MODE', 'test_dataset'), choices=['fine_tune', 'predict', 'test_dataset', 'convert_dataset', 'convert_dataset_text'])
-    argparser.add_argument('--model_name', type=str, default=os.getenv('MODEL_NAME', 'unsloth/mistral-7b-v0.3-bnb-4bit'))
+    argparser.add_argument('--mode', type=str, default=os.getenv('MODE', 'test_dataset'), choices=['fine_tune', 'predict', 'test_dataset', 'test_dataset_txt', 'convert_dataset', 'convert_dataset_text'])
+    argparser.add_argument('--model_name', type=str, default=os.getenv('MODEL_NAME', 'unsloth/mistral-7b-v0.3-bnb-4bit'), 
+                           choices=[
+                               'TinyLlama/TinyLlama-1.1B-Chat-v1.0',
+                               'unsloth/mistral-7b-v0.3-bnb-4bit',
+                               'microsoft/phi-2',                               
+                            ])
     argparser.add_argument('--datasets_path', type=str, default=os.getenv('DATASETS_PATH', './data'))
     argparser.add_argument('--max_length', type=int, default=int(os.getenv('MAX_LENGTH', 4096)))
     argparser.add_argument('--batch_size', type=int, default=int(os.getenv('BATCH_SIZE', 2)))
@@ -362,7 +481,7 @@ if __name__ == '__main__':
     argparser.add_argument('--bnb_4bit_compute_dtype', type=str, default=os.getenv('BNB_4BIT_COMPUTE_DTYPE', 'float16'))
     argparser.add_argument('--bnb_4bit_quant_type', type=str, default=os.getenv('BNB_4BIT_QUANT_TYPE', 'nf4'))
     argparser.add_argument('--bnb_4bit_use_double_quant', type=bool, default=os.getenv('BNB_4BIT_USE_DOUBLE_QUANT', True))
-    argparser.add_argument('--data_batch_size', type=int, default=int(os.getenv('DATA_BATCH_SIZE', 1000)))  # New argument
+    argparser.add_argument('--data_batch_size', type=int, default=int(os.getenv('DATA_BATCH_SIZE', 0)))  # New argument
 
     args = argparser.parse_args()
 
@@ -372,27 +491,27 @@ if __name__ == '__main__':
     if args.mode == 'test_dataset':
         bus_occupancy_fine_tune = BusOccupancyFineTune(
             datasets_path=args.datasets_path,
-            data_batch_size=args.data_batch_size
+            data_batch_size=args.data_batch_size if args.data_batch_size else 10
             )
         # logger.debug(f"Reading datasets in batches: {datasets_path}")
         l = bus_occupancy_fine_tune.read_datasets_in_batches()
         resp = next(l)
         logger.debug(f"Response: {len(resp)}")
-        # logger.debug('\n'.join(resp))
-        logger.debug(resp[0][1])
+        logger.debug('\n'.join([str(i) for i in resp[0]]))
+        # logger.debug(resp[0][1])
         l.close()
     
     if args.mode == 'test_dataset_txt':
         bus_occupancy_fine_tune = BusOccupancyFineTune(
             datasets_path=args.datasets_path,
-            data_batch_size=args.data_batch_size
+            data_batch_size=args.data_batch_size if args.data_batch_size else 10
             )
         # logger.debug(f"Reading datasets in batches: {datasets_path}")
         l = bus_occupancy_fine_tune.read_datasets_in_batches(type_of_database=str)
         resp = next(l)
         logger.debug(f"Response: {len(resp)}")
-        # logger.debug('\n'.join(resp))
-        logger.debug(resp[0][1])
+        logger.debug('\n'.join([str(i) for i in resp[0]]))
+        # logger.debug(resp[0])
         l.close()
 
     if args.mode == 'convert_dataset':
@@ -428,7 +547,6 @@ if __name__ == '__main__':
         )
         bus_occupancy_fine_tune.run()
     elif args.mode == 'predict':
-        bus_occupancy_fine_tune = BusOccupancyFineTune(mode='predict')
-        bus_occupancy_fine_tune.load_trained_model(path=args.output_dir)
+        bus_occupancy_fine_tune = BusOccupancyFineTune(mode='predict')        
         text = input("Enter your text: ")
         logger.debug(bus_occupancy_fine_tune.predict(text))
