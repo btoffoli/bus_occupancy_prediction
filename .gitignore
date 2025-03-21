@@ -11,7 +11,7 @@ images/
 inmet*
 var
 .env
-data/
+data*
 mini_data/
 unsloth_compiled_cache/
 .ipynb_checkpoints

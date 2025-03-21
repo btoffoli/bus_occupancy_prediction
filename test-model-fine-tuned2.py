@@ -7,16 +7,16 @@ import torch
 model_path = os.path.join(os.getcwd(), 'weight_models_sft')
 
 
-from fine_tune3 import quantization_config
+from fine_tune4 import quantization_config
 
 # Load the model
 model = AutoModelForCausalLM\
     .from_pretrained(model_path, \
         quantization_config=quantization_config,\
-        device_map="auto",
+        device_map="cpu",
         max_memory={0: "2GB", "cpu": "16GB"},  # More aggressive CPU offloading
         offload_folder="offload_folder",  
-                                             )
+)
 
 
 # Load the tokenizer from the same path

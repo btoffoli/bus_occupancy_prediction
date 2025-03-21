@@ -14,6 +14,8 @@ import argparse
 import logging
 import pandas as pd
 from datetime import datetime, timezone, timedelta
+from typing import Dict
+
 # from convert_data_to_json import convert_to_dict, convert_to_text
 
 logging.basicConfig(level=logging.DEBUG)
@@ -24,14 +26,25 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Força uso da GPU 0
 
 
+
+# days_of_week = {
+#     0: "domingo",
+#     1: "segunda-feira",
+#     2: "terça-feira",
+#     3: "quarta-feira",
+#     4: "quinta-feira",
+#     5: "sexta-feira",
+#     6: "sabado"
+# }
+
 days_of_week = {
-    0: "domingo",
-    1: "segunda",
-    2: "terça",
-    3: "quarta",
-    4: "quinta",
-    5: "sexta",
-    6: "sabado"
+    0: "Sunday",
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday"
 }
 
 TZ=timezone(timedelta(hours=-3))
@@ -40,40 +53,31 @@ def convert_tz(str_dt: str, tz: timezone):
     d = datetime.fromisoformat(str_dt)
     return d.astimezone(tz)
 
+{"instruction":"","input":"wednesday, no rain and cold, route 2856, scheduled at 00:00 and started at 00:00. The occupancy level at bust stop 3241 is:","output":"0"}
+
 # human_speaks = "Sabendo que está %clima_tempo e a temperatura é %temperatura. Qual a lotação da linha %linha para o ponto %ponto para %dia às %hora?"
-human_speaks = "Para uma viagem do itinerário %trip_route_id, que geralmente começa %trip_scheduled_time e que começou %trip_start_time e terminou %trip_end_time, no dia %days_of_week, %weather_precipitation e temperatura %weather_temperature. Qual o nível de lotação para o ponto %bus_stop_id?"
+# human_speaks = "Sendo o dia da semana %day_of_week, com %weather_precipitation e %weather_temperature, para uma viagem do itinerario %trip_route_id, que geralmente inicia %trip_scheduled_time e que iniciou %trip_start_time e terminou %trip_end_time. Qual o nivel de ocupacao para o ponto %bus_stop_id?"
 # delayed_human_speaks = "Para uma viagem do itinerario %trip_route_id, que geralmente começa %trip_scheduled_time mas que começou %trip_start_time e terminou %trip_end_time, no dia %days_of_week, %weather_precipitation e temperatura %weather_temperature. Qual o nível de lotação para o ponto %bus_stop_id?"
 
+human_speaks="%day_of_week, %weather_precipitation and %weather_temperature, route %trip_route_id, scheduled at %trip_scheduled_time and started at %trip_start_time. The occupancy level at bust stop %bus_stop_id is:"
 
 
-bot_speaks = "No ponto %busStopId, o nível de lotação é %occupancyLevel, para o itinerário %trip_route_id"
 
+# bot_speaks = "Sendo o dia da semana %day_of_week, no ponto %busStopId, o nivel de ocupacao é %occupancyLevel, para o itinerário %trip_route_id"
+
+# bot_speaks = "Sendo o dia da semana %day_of_week, no ponto %busStopId, o nivel de ocupacao é %occupancyLevel, para o itinerário %trip_route_id"
+
+bot_speaks = "%occupancyLevel"
 
 def convert_to_text(
         register: dict,
     ):
-    logger.debug(f"Register(type): {type(register)}")
-    logger.debug(f"Register: {register}")
-
-    trip_route_id = register['tripRouteId']
-    trip_scheduled_time = register['tripScheduledTime']
-    trip_start_time = register['tripStartTime']
-    trip_end_time = register['tripEndTime']        
-    weather_precipitation = register['weatherPrecipitation']
-    weather_temperature = register['weatherTemperature']
-    bus_stop_id = register['busStopId']
-    occupancy_level = register['occupancyLevel']
-    normalized_location = register['busStopLocation']/register['routeTotalLength'],  
+    resp = convert_to_json(register)
+    # return f"<human>{resp['input']}<bot>{resp['']}"
+    return f"""<human>: {resp['input']}\n<bot>: {resp['output']}\n\n"""
 
 
-    scheduled_datetime = convert_tz(trip_scheduled_time, TZ)
-    scheduled_time = scheduled_datetime.strftime("%H:%M")
-    start_datetime = convert_tz(trip_start_time, TZ).strftime("%H:%M")
-    end_time = convert_tz(trip_end_time, TZ).strftime("%H:%M")
     
-    dw = days_of_week[scheduled_datetime.weekday()]
-
-    occupancy = 'Lotado' if occupancy_level > 1 else 'Vazio' if occupancy_level < 1 else 'Cheio'
 
 def convert_to_json(
         register: dict,
@@ -99,11 +103,9 @@ def convert_to_json(
     
     dw = days_of_week[scheduled_datetime.weekday()]
 
-    occupancy = 'Lotado' if occupancy_level > 1 else 'Vazio' if occupancy_level < 1 else 'Cheio'
+    # occupancy = 'Lotado' if occupancy_level > 1 else 'Vazio' if occupancy_level < 1 else 'Cheio'
 
-
-
-                        
+    occupancy = str(occupancy_level)
 
 
 
@@ -112,18 +114,19 @@ def convert_to_json(
         .replace("%trip_scheduled_time", scheduled_time)\
         .replace("%trip_start_time", start_datetime)\
         .replace("%trip_end_time", end_time)\
-        .replace("%days_of_week", dw)\
-        .replace("%weather_precipitation", 'Chovendo' if weather_precipitation > 0 else 'Não Chovendo')\
-        .replace("%weather_temperature", 'Quente' if weather_temperature > 20 else 'Frio')\
+        .replace("%day_of_week", dw)\
+        .replace("%weather_precipitation", 'heavy rain' if weather_precipitation > 2 else 'light rain' if weather_precipitation > 0 else 'no rain')\
+        .replace("%weather_temperature", 'hot' if weather_temperature > 27 else 'warm' if weather_temperature > 18 else 'cold')\
         .replace("%bus_stop_id", str(bus_stop_id))
 
     bot_speaking = bot_speaks\
         .replace("%busStopId", str(bus_stop_id))\
         .replace("%trip_route_id", str(trip_route_id))\
+        .replace("%day_of_week", dw)\
         .replace("%occupancyLevel", occupancy)
 
     return {
-        "instruction": "",
+        # "instruction": "",
         "input": human_speaking,
         "output": bot_speaking,        
     }
@@ -161,19 +164,47 @@ class BusOccupancyFineTune:
             bnb_4bit_quant_type = kwargs.get("bnb_4bit_quant_type", "nf4")
             bnb_4bit_use_double_quant = kwargs.get("bnb_4bit_use_double_quant", True)
 
+            # quantization_config = BitsAndBytesConfig(
+            #     load_in_4bit=load_in_4bit,
+            #     bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
+            #     bnb_4bit_quant_type=bnb_4bit_quant_type,
+            #     bnb_4bit_use_double_quant=bnb_4bit_use_double_quant,
+            # )
+
+            # quantization_config = BitsAndBytesConfig(
+            #     load_in_4bit=True,
+            #     bnb_4bit_use_double_quant=True,
+            #     bnb_4bit_quant_type="nf4",
+            #     bnb_4bit_compute_dtype=torch.bfloat16,
+            #     llm_int8_enable_fp32_cpu_offload=True
+            # )
+
             quantization_config = BitsAndBytesConfig(
-                load_in_4bit=load_in_4bit,
-                bnb_4bit_compute_dtype=bnb_4bit_compute_dtype,
-                bnb_4bit_quant_type=bnb_4bit_quant_type,
-                bnb_4bit_use_double_quant=bnb_4bit_use_double_quant,
+                load_in_8bit=True,
+                llm_int8_enable_fp32_cpu_offload=True
             )
+
+            device_map = {
+                "model.embed_tokens": 0,
+                "model.layers.0": 0,
+                "model.layers.1": 0,
+                # ... Add more layers to GPU (device 0) as your memory allows
+                "model.layers.2": "cpu",
+                "model.layers.3": "cpu",
+                # ... Put remaining layers on CPU
+                "model.norm": 0,
+                "lm_head": 0
+            }
+
+            print(f"self.model_name: {self.model_name}")
 
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
-                # quantization_config=quantization_config,
-                device_map="auto",
+                quantization_config=quantization_config,
+                device_map=device_map
+                # device_map="auto",
                 # max_memory=torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else None,
-                max_memory={0: "5GB"},  # Critical adjustment
+                # max_memory={0: "2GB"},  # Critical adjustment
             )
 
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -232,8 +263,37 @@ class BusOccupancyFineTune:
         inputs = self.tokenizer(text, return_tensors="pt")
         outputs = self.model.generate(**inputs, max_new_tokens=50)
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    def convert_datasets(self, type_of_database: str | Dict = Dict):
+        logger.debug(f"Converting datasets: {self.datasets_path}")
+        file_path_current = None
+        acc = []
+        for batch, file_path in self.read_datasets_in_batches(type_of_database):
+            if not file_path_current:
+                file_path_current = file_path
 
-    def read_datasets_in_batches(self):
+            # if file_path has changed
+            if file_path != file_path_current:
+                #store acc in file
+                logger.debug(f"Storing acc in file: {file_path_current}")
+                if type_of_database == Dict:
+                    df_acc = pd.DataFrame(acc)
+                    df_acc.to_json(file_path_current.replace('.jsonl', '.converted.jsonl'), orient='records', lines=True)
+                else:
+                    with open(file_path_current.replace('.jsonl', '.converted.txt'), "w") as f:
+                        f.writelines(acc)
+                        
+
+                file_path_current = file_path
+                acc.clear()
+                
+            
+
+            acc.extend(batch)    
+        
+
+
+    def read_datasets_in_batches(self, type_of_database: str | Dict = Dict):
         logger.debug(f"Reading datasets in batches: {self.datasets_path}")
         filenames = sorted(os.listdir(self.datasets_path))
         logger.debug(f"filenames: {filenames}")
@@ -245,9 +305,12 @@ class BusOccupancyFineTune:
                     df = pd.read_json(file_path, lines=True)
                     acc = []
                     for index, row in df.iterrows():
-                        acc.append(convert_to_json(row))
+                        if type_of_database == Dict:
+                            acc.append(convert_to_json(row))
+                        else:
+                            acc.append(convert_to_text(row))
                         if len(acc) == self.data_batch_size:
-                            yield acc
+                            yield acc, file_path
                             acc = []
                     
 
@@ -287,7 +350,7 @@ class BusOccupancyFineTune:
 if __name__ == '__main__':
     load_dotenv(override=True)
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--mode', type=str, default=os.getenv('MODE', 'test_dataset'), choices=['fine_tune', 'predict', 'test_dataset'])
+    argparser.add_argument('--mode', type=str, default=os.getenv('MODE', 'test_dataset'), choices=['fine_tune', 'predict', 'test_dataset', 'convert_dataset', 'convert_dataset_text'])
     argparser.add_argument('--model_name', type=str, default=os.getenv('MODEL_NAME', 'unsloth/mistral-7b-v0.3-bnb-4bit'))
     argparser.add_argument('--datasets_path', type=str, default=os.getenv('DATASETS_PATH', './data'))
     argparser.add_argument('--max_length', type=int, default=int(os.getenv('MAX_LENGTH', 4096)))
@@ -314,10 +377,37 @@ if __name__ == '__main__':
         # logger.debug(f"Reading datasets in batches: {datasets_path}")
         l = bus_occupancy_fine_tune.read_datasets_in_batches()
         resp = next(l)
+        logger.debug(f"Response: {len(resp)}")
         # logger.debug('\n'.join(resp))
-        logger.debug(resp[0])
+        logger.debug(resp[0][1])
         l.close()
+    
+    if args.mode == 'test_dataset_txt':
+        bus_occupancy_fine_tune = BusOccupancyFineTune(
+            datasets_path=args.datasets_path,
+            data_batch_size=args.data_batch_size
+            )
+        # logger.debug(f"Reading datasets in batches: {datasets_path}")
+        l = bus_occupancy_fine_tune.read_datasets_in_batches(type_of_database=str)
+        resp = next(l)
+        logger.debug(f"Response: {len(resp)}")
+        # logger.debug('\n'.join(resp))
+        logger.debug(resp[0][1])
+        l.close()
+
+    if args.mode == 'convert_dataset':
+        bus_occupancy_fine_tune = BusOccupancyFineTune(
+            datasets_path=args.datasets_path,
+            data_batch_size=args.data_batch_size
+            )
+        bus_occupancy_fine_tune.convert_datasets()
         
+    if args.mode == 'convert_dataset_text':
+        bus_occupancy_fine_tune = BusOccupancyFineTune(
+            datasets_path=args.datasets_path,
+            data_batch_size=args.data_batch_size
+            )
+        bus_occupancy_fine_tune.convert_datasets(type_of_database=str)
 
 
     if args.mode == 'fine_tune':
