@@ -150,11 +150,19 @@ class BusOccupancyFineTune:
         self.output_dir = kwargs.get("output_dir", output_default_dir)
         self.data_batch_size = kwargs.get("data_batch_size", 1000)  # New parameter for data batch size
 
+        self.preprocess = kwargs.get("preprocess_data", False)
+        
+        self.__load_training_args()
+
+        if mode != 'predict':
+            self.__load_dataset()
+        
+
         if mode in ['predict', 'fine_tune']:
             self.__load_config()
         
         if mode == 'predict':
-            self.__load_trained_model()
+            self.__load_fine_tuned_model()
 
         elif mode == 'fine_tune':
             self.__load_model_for_training()
@@ -163,7 +171,7 @@ class BusOccupancyFineTune:
     
     def train(self):
         if self.data_batch_size:
-            for batch in self.read_datasets_in_batches():
+            for batch in self.train_dataset:                
                 self.trainer = SFTTrainer(
                     model=self.model,
                     tokenizer=self.tokenizer,
@@ -172,14 +180,6 @@ class BusOccupancyFineTune:
                 )
                 self.trainer.train()
         else:
-            ds = load_dataset(
-                path=self.datasets_path,
-                data_files=['occupancy-events-20240301.converted.txt'],
-                split="train"
-            )
-            # Falta converter com preprocess_data
-            #linha 66 do fine_tunex.py
-
             self.trainer = SFTTrainer(
                 model=self.model,
                 tokenizer=self.tokenizer,
@@ -199,6 +199,8 @@ class BusOccupancyFineTune:
                     load_in_4bit=True,
                     bnb_4bit_use_double_quant=True,
                     bnb_4bit_quant_type="nf4",
+                    lora_dropout=0.0,  # No dropout to save memory
+                    bias="none",
                     bnb_4bit_compute_dtype=torch.float16,  # Using float16 for memory efficiency
                 )
 
@@ -324,6 +326,20 @@ class BusOccupancyFineTune:
         else:
             logger.warning("Unknown model name supported...")
             self.training_args = None
+
+    def __load_dataset(self):
+        if self.data_batch_size:
+            ds = self.read_datasets_in_batches()        
+        else:
+            ds = load_dataset(
+                path=self.datasets_path,
+                data_files=sorted(os.listdir(self.datasets_path)),
+                split="train",             
+            )
+            if self.preprocess:
+                ds = ds.map(self.__preprocess_data, batched=True)
+
+        self.train_dataset = ds
             
 
     def __load_model_for_training(self, **kwargs):
@@ -356,27 +372,30 @@ class BusOccupancyFineTune:
         #     llm_int8_enable_fp32_cpu_offload=True
         # )
 
-        device_map = {
-            "model.embed_tokens": 0,
-            "model.layers.0": 0,
-            "model.layers.1": 0,
-            # ... Add more layers to GPU (device 0) as your memory allows
-            "model.layers.2": "cpu",
-            "model.layers.3": "cpu",
-            # ... Put remaining layers on CPU
-            "model.norm": 0,
-            "lm_head": 0
-        }
+        # device_map = {
+        #     "model.embed_tokens": 0,
+        #     "model.layers.0": 0,
+        #     "model.layers.1": 0,
+        #     # ... Add more layers to GPU (device 0) as your memory allows
+        #     "model.layers.2": "cpu",
+        #     "model.layers.3": "cpu",
+        #     # ... Put remaining layers on CPU
+        #     "model.norm": 0,
+        #     "lm_head": 0
+        # }
+        device_map = "auto"
 
         logger.info(f"self.model_name: {self.model_name}")
 
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
             quantization_config=self.quantization_config,
-            device_map=device_map
-            # device_map="auto",
+            # device_map=device_map
+            device_map="auto",
             # max_memory=torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else None,
             # max_memory={0: "2GB"},  # Critical adjustment
+            # ,max_memory={"cuda: 0": "3GB", "cpu": "16GB"},  # More aggressive CPU offloading
+            offload_folder="offload_folder",  # Enable disk offloading if memory still insufficient
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -400,13 +419,15 @@ class BusOccupancyFineTune:
 
 
     def __load_fine_tuned_model(self):
-        self.model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path=self.output_dir)
+        self.model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path=self.output_dir).to("cuda:0")
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path=self.output_dir)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def predict(self, text):
         inputs = self.tokenizer(text, return_tensors="pt")
-        outputs = self.model.generate(**inputs, max_new_tokens=50)
+        if torch.cuda.is_available():
+            inputs = inputs.to("cuda")
+        outputs = self.model.generate(**inputs, max_new_tokens=5)
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
     
     def convert_datasets(self, type_of_database: str | Dict = Dict):
@@ -458,8 +479,15 @@ class BusOccupancyFineTune:
                             yield acc, file_path
                             acc = []
                     
-
-
+    
+    @staticmethod
+    def __preprocess_data(tokenizer, ds):
+        """Tokenize and preprocess the dataset"""
+        inputs = tokenizer(ds['text'], padding="max_length", truncation=True, max_length=512, return_tensors="pt")
+        inputs['input_ids'] = inputs['input_ids'].long()  # Ensure input_ids are of type Long
+        inputs['attention_mask'] = inputs['attention_mask'].long()  # Ensure attention_mask are of type Long
+        return inputs
+        
 
 if __name__ == '__main__':
     load_dotenv(override=True)
@@ -476,12 +504,13 @@ if __name__ == '__main__':
     argparser.add_argument('--batch_size', type=int, default=int(os.getenv('BATCH_SIZE', 2)))
     argparser.add_argument('--learning_rate', type=float, default=float(os.getenv('LEARNING_RATE', 2e-5)))
     argparser.add_argument('--num_epochs', type=int, default=int(os.getenv('NUM_EPOCHS', 3)))
-    argparser.add_argument('--output_dir', type=str, default=os.getenv('OUTPUT_DIR', './results'))
+    argparser.add_argument('--output_dir', type=str, default=os.getenv('OUTPUT_DIR'))
     argparser.add_argument('--load_in_4bit', type=bool, default=os.getenv('LOAD_IN_4BIT', True))
     argparser.add_argument('--bnb_4bit_compute_dtype', type=str, default=os.getenv('BNB_4BIT_COMPUTE_DTYPE', 'float16'))
     argparser.add_argument('--bnb_4bit_quant_type', type=str, default=os.getenv('BNB_4BIT_QUANT_TYPE', 'nf4'))
     argparser.add_argument('--bnb_4bit_use_double_quant', type=bool, default=os.getenv('BNB_4BIT_USE_DOUBLE_QUANT', True))
     argparser.add_argument('--data_batch_size', type=int, default=int(os.getenv('DATA_BATCH_SIZE', 0)))  # New argument
+    argparser.add_argument('--preprocessing_data', type=bool, default=os.getenv('PREPROCESSING_DATA', False))
 
     args = argparser.parse_args()
 
@@ -490,6 +519,7 @@ if __name__ == '__main__':
 
     if args.mode == 'test_dataset':
         bus_occupancy_fine_tune = BusOccupancyFineTune(
+            preprocessing_data=args.preprocessing_data,
             datasets_path=args.datasets_path,
             data_batch_size=args.data_batch_size if args.data_batch_size else 10
             )
@@ -503,6 +533,7 @@ if __name__ == '__main__':
     
     if args.mode == 'test_dataset_txt':
         bus_occupancy_fine_tune = BusOccupancyFineTune(
+            preprocessing_data=args.preprocessing_data,
             datasets_path=args.datasets_path,
             data_batch_size=args.data_batch_size if args.data_batch_size else 10
             )
@@ -516,6 +547,7 @@ if __name__ == '__main__':
 
     if args.mode == 'convert_dataset':
         bus_occupancy_fine_tune = BusOccupancyFineTune(
+            preprocessing_data=args.preprocessing_data,
             datasets_path=args.datasets_path,
             data_batch_size=args.data_batch_size
             )
@@ -536,7 +568,7 @@ if __name__ == '__main__':
             max_length=args.max_length,            
             learning_rate=args.learning_rate,
             num_epochs=args.num_epochs,
-            output_dir=args.output_dir,
+            output_dir=args.output_dir if args.output_dir else f'tuned_{args.model_name}',
             load_in_4bit=args.load_in_4bit,
             bnb_4bit_compute_dtype=args.bnb_4bit_compute_dtype,
             bnb_4bit_quant_type=args.bnb_4bit_quant_type,
@@ -547,6 +579,6 @@ if __name__ == '__main__':
         )
         bus_occupancy_fine_tune.run()
     elif args.mode == 'predict':
-        bus_occupancy_fine_tune = BusOccupancyFineTune(mode='predict')        
+        bus_occupancy_fine_tune = BusOccupancyFineTune(mode='predict', model_name=args.model_name)        
         text = input("Enter your text: ")
         logger.debug(bus_occupancy_fine_tune.predict(text))

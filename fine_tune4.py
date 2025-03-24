@@ -18,7 +18,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Force use of GPU 0
 mlname = "microsoft/phi-2"
 
 # Dataset loading - avoid streaming since we need length
-file_path = os.path.join(os.getcwd(), 'mini_data')
+file_path = os.path.join(os.getcwd(), 'data_converted_txt')
 ds = load_dataset(
     path=file_path,
     data_files=['occupancy-events-20240301.converted.txt'],
@@ -38,7 +38,7 @@ model = AutoModelForCausalLM.from_pretrained(
     mlname,
     quantization_config=quantization_config,
     device_map="auto",
-    max_memory={0: "2GB", "cpu": "16GB"},  # More aggressive CPU offloading
+    # max_memory={0: "2GB", "cpu": "16GB"},  # More aggressive CPU offloading
     offload_folder="offload_folder",  # Enable disk offloading if memory still insufficient
 )
 tokenizer = AutoTokenizer.from_pretrained(mlname)
@@ -71,7 +71,7 @@ def preprocess_data(examples):
     return inputs
 
 # Apply preprocessing to the dataset
-ds = ds.map(preprocess_data, batched=True)
+ds = ds.map(preprocess_data, batched=True, batch_size=1000)
 
 if __name__ == '__main__':
     # Clear GPU memory before starting

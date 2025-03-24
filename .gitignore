@@ -17,3 +17,6 @@ unsloth_compiled_cache/
 .ipynb_checkpoints
 weight_models_sft
 logs
+results
+tuned_*
+.vscode

@@ -27,8 +27,8 @@ tokenizer = AutoTokenizer.from_pretrained(model_path)
 # tokenizer = before_tokenizer
 
 # Test the model
-prompt = """<human>: Thursday, no rain and warm, route 2856, scheduled at 00:00 and started at 00:00. The occupancy level at bust stop 3263 is:
-<bot>: """
+# prompt = "Thursday, no rain and warm, route 4391, scheduled at 00:01 and started at 00:02. The occupancy level at bust stop 3637 is:"
+prompt = "Thursday, no rain and warm, route 2296, scheduled at 00:01 and started at 00:01. The occupancy level at bust stop 43 is:"
 inputs = tokenizer(prompt, return_tensors="pt")
 
 # Move to GPU if available
