@@ -16,8 +16,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Force use of GPU 0
 
 # Choose a much smaller model for 3.8GB GPU
 # Option 1: TinyLlama (1.1B parameters)
-# mlname = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-mlname = "unsloth/mistral-7b-v0.3-bnb-4bit"
+mlname = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 # Option 2: Phi-2 (2.7B parameters)
 # mlname = "microsoft/phi-2"
 

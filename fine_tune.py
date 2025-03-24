@@ -231,6 +231,7 @@ class BusOccupancyFineTune:
                     load_in_4bit=True,
                     bnb_4bit_use_double_quant=True,
                     bnb_4bit_quant_type="nf4",
+                    max_memory={0: "2GB", "cpu": "16GB"},  # More aggressive CPU offloading
                     bnb_4bit_compute_dtype=torch.float16,  # Using float16 for memory efficiency
                 )
 
@@ -372,30 +373,29 @@ class BusOccupancyFineTune:
         #     llm_int8_enable_fp32_cpu_offload=True
         # )
 
-        # device_map = {
-        #     "model.embed_tokens": 0,
-        #     "model.layers.0": 0,
-        #     "model.layers.1": 0,
-        #     # ... Add more layers to GPU (device 0) as your memory allows
-        #     "model.layers.2": "cpu",
-        #     "model.layers.3": "cpu",
-        #     # ... Put remaining layers on CPU
-        #     "model.norm": 0,
-        #     "lm_head": 0
-        # }
-        device_map = "auto"
+        device_map = {
+            "model.embed_tokens": 0,
+            "model.layers.0": 0,
+            "model.layers.1": 0,
+            # ... Add more layers to GPU (device 0) as your memory allows
+            "model.layers.2": "cpu",
+            "model.layers.3": "cpu",
+            # ... Put remaining layers on CPU
+            "model.norm": 0,
+            "lm_head": 0
+        }
+        # device_map = "auto"
 
         logger.info(f"self.model_name: {self.model_name}")
 
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
             quantization_config=self.quantization_config,
-            # device_map=device_map
-            device_map="auto",
+            device_map=device_map,            
             # max_memory=torch.cuda.get_device_properties(0).total_memory if torch.cuda.is_available() else None,
             # max_memory={0: "2GB"},  # Critical adjustment
-            # ,max_memory={"cuda: 0": "3GB", "cpu": "16GB"},  # More aggressive CPU offloading
-            offload_folder="offload_folder",  # Enable disk offloading if memory still insufficient
+            # max_memory={"cuda: 0": "3GB", "cpu": "16GB"},  # More aggressive CPU offloading
+            offload_folder=True,  # Enable disk offloading if memory still insufficient
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)

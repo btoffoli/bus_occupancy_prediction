@@ -8,6 +8,27 @@
             "program": "${file}"
         },
 
+        {
+            "name": "fine_tune_test_dataset",
+            "type": "debugpy",
+            "request": "launch",
+            "args": ["--mode", "test_dataset"],
+            
+
+            "program": "fine_tune.py"
+        },
+
+        {
+            "name": "fine_tune_convert_dataset_text",
+            "type": "debugpy",
+            "request": "launch",
+            "args": ["--mode", "convert_dataset_text", "--datasets_path", "./data"],
+            
+
+            "program": "fine_tune.py"
+        },
+
+
       
 
     ]
