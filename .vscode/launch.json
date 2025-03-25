@@ -1,6 +1,27 @@
 {
-    "configurations": [
+  "configurations": [
+    {
+      "name": "Python Debugger: Python File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}"
+    },
+    {
+      "name": "Main2",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main2.py",
+      "args": [
+        "--mode",
+        "vehiclerun",
+        "--start-date",
+        "2023-11-01",
+        "--end-date",
+        "2023-12-01"
+      ]
+    },
 
+<<<<<<< Updated upstream
         {
             "name": "Python Debugger: Python File",
             "type": "debugpy",
@@ -33,3 +54,14 @@
 
     ]
 }
+=======
+    {
+      "name": "fine_tune - FT",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/fine_tune.py",
+      "args": ["--mode", "fine_tune", "--datasets_path", "./mini_data"]
+    }
+  ]
+}
+>>>>>>> Stashed changes

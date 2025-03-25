@@ -1,0 +1,10 @@
+{
+  "editor.inlineSuggest.enabled": true,
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": true,
+    "markdown": true,
+    "python": true
+  },
+  "jupyter.interactiveWindow.codeLens.enable": true
+}

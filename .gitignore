@@ -19,6 +19,8 @@ weight_models_sft
 logs
 results
 tuned_*
-.vscode
+# .vscode
 .vitepress/cache
 node_modules
+**.orig
+launch_*
