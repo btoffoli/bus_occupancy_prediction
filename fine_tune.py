@@ -154,10 +154,7 @@ class BusOccupancyFineTune:
         
         self.__load_training_args()
 
-        if mode != 'predict':
-            self.__load_dataset()
         
-
         if mode in ['predict', 'fine_tune']:
             self.__load_config()
         
@@ -165,6 +162,7 @@ class BusOccupancyFineTune:
             self.__load_fine_tuned_model()
 
         elif mode == 'fine_tune':
+            self.__load_dataset()
             self.__load_model_for_training()
             
             
