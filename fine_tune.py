@@ -126,8 +126,8 @@ def convert_to_json(
         .replace("%occupancyLevel", occupancy)
 
     return {
-        # "instruction": "",
-        "input": human_speaking,
+        "instruction": human_speaking,
+        "input": "",
         "output": bot_speaking,        
     }
     # return f"""<human>: {human_speaking}\n<bot>:{bot_speaking}\n\n"""
@@ -438,7 +438,7 @@ class BusOccupancyFineTune:
 
             # if file_path has changed
             if file_path != file_path_current:
-                #store acc in file
+                # store acc in file
                 logger.debug(f"Storing acc in file: {file_path_current}")
                 if type_of_database == Dict:
                     df_acc = pd.DataFrame(acc)
@@ -446,15 +446,21 @@ class BusOccupancyFineTune:
                 else:
                     with open(file_path_current.replace('.jsonl', '.converted.txt'), "w") as f:
                         f.writelines(acc)
-                        
 
                 file_path_current = file_path
                 acc.clear()
-                
-            
 
-            acc.extend(batch)    
-        
+            acc.extend(batch)
+
+        # Handle the last file after the loop
+        if file_path_current:
+            logger.debug(f"Storing acc in file: {file_path_current}")
+            if type_of_database == Dict:
+                df_acc = pd.DataFrame(acc)
+                df_acc.to_json(file_path_current.replace('.jsonl', '.converted.jsonl'), orient='records', lines=True)
+            else:
+                with open(file_path_current.replace('.jsonl', '.converted.txt'), "w") as f:
+                    f.writelines(acc)
 
 
     def read_datasets_in_batches(self, type_of_database: str | Dict = Dict):
@@ -476,6 +482,8 @@ class BusOccupancyFineTune:
                         if len(acc) == self.data_batch_size:
                             yield acc, file_path
                             acc = []
+        if len(acc):
+            yield acc, file_path
                     
     
     @staticmethod
@@ -547,14 +555,14 @@ if __name__ == '__main__':
         bus_occupancy_fine_tune = BusOccupancyFineTune(
             preprocessing_data=args.preprocessing_data,
             datasets_path=args.datasets_path,
-            data_batch_size=args.data_batch_size
+            data_batch_size=args.data_batch_size if args.data_batch_size else 1000
             )
         bus_occupancy_fine_tune.convert_datasets()
         
     if args.mode == 'convert_dataset_text':
         bus_occupancy_fine_tune = BusOccupancyFineTune(
             datasets_path=args.datasets_path,
-            data_batch_size=args.data_batch_size
+            data_batch_size=args.data_batch_size if args.data_batch_size else 1000
             )
         bus_occupancy_fine_tune.convert_datasets(type_of_database=str)
 
