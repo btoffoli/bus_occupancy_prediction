@@ -2,89 +2,184 @@
 
 ### Problem Formulation
 
-In this research, we address the challenge of predicting bus occupancy levels categorized into three discrete states: empty (0), full (1), and overcrowded (2). Rather than employing traditional regression or classification approaches, we explore the potential of transformer-based language models, which have demonstrated remarkable capabilities in various prediction tasks when properly fine-tuned.
+In this research, we address the challenge of predicting bus occupancy levels categorized into three discrete states: empty (0), full (1), and overcrowded (2). We explored the potential of transformer-based language models by fine-tuning them using an instruction-based format that transforms transportation data into a structured prediction task.
 
-### Data Preparation
+### Data Preparation and Formatting
 
-The data for this study was sourced from a bus transportation system's operational records. To leverage pre-trained language models for this task, we converted the structured transportation data into a text-based format. Each query was formulated to include contextual information such as:
-
-- Day of the week
-- Weather conditions (temperature: warm > 27°C, normal 18-27°C, cold < 18°C)
-- Precipitation status (no rain, light rain, heavy rain)
-- Bus route number
-- Scheduled departure time
-- Actual departure time
-- Bus stop identifier
-
-This information was structured in natural language format to serve as input for the language models. The target output was the occupancy level (0, 1, or 2) at the specified bus stop. An example of this query-response format used for fine-tuning is:
+The data preparation process underwent a significant transformation to better align with modern large language model (LLM) fine-tuning approaches. We adopted an instruction-based format that provides clear context and a specific prediction request. The new format includes:
 
 ```
-<human>: Thursday, no rain and warm, route 2296, scheduled at 00:01 and started at 00:01. The occupancy level at bust stop 43 is:
-<bot>: 1
+Below is an instruction that describes a task. Write a response that appropriately completes the request.
+
+### Instruction:
+[Day], [precipitation status] and [temperature status], route [route number], scheduled at [scheduled time] and started at [actual start time]. The occupancy level at bust stop [stop number] is:
+
+### Response:
+[Occupancy Level: 0, 1, or 2]
 ```
 
-### Model Selection and Implementation
-
-We selected three language models of varying architectures and parameter counts to evaluate their efficacy for this task:
-
-1. **TinyLlama-1.1B-Chat-v1.0**: A compact model with approximately 1.1 billion parameters
-2. **mistral-7b-v0.3-bnb-4bi**: A medium-sized model with 7 billion parameters, quantized for efficiency
-3. **microsoft/phi-2**: A newer model with advanced capabilities and efficient architecture
-
-All models were appropriately quantized to operate within our available hardware constraints: an Intel i7 processor with 32GB RAM and an NVIDIA RTX 3060 GPU. We utilized PyTorch as our deep learning framework, Unsloth for optimization and efficient fine-tuning, and the Hugging Face ecosystem for model management and implementation.
-
-The implementation was carried out in Python notebooks, with a dedicated class abstracting the data conversion, testing procedures, and model construction, while respecting the specific configuration requirements and hardware limitations for each model.
-
-### Fine-tuning Process
-
-The fine-tuning process involved adapting these general-purpose language models to the specific task of predicting bus occupancy. By providing examples of queries and their corresponding correct answers, we guided the models to learn the patterns and relationships between contextual variables (day, weather, route information) and resulting occupancy levels.
-
-This approach takes advantage of the models' pre-existing knowledge and pattern recognition capabilities while specializing them for our transportation domain. The text-based formulation allows us to represent complex, multi-dimensional inputs in a form these models can effectively process.
-
-### Experimental Results
-
-Our testing revealed varying performance across the three models. Here we present example predictions for three test cases:
-
-#### Test Case 1
+Example input:
 
 ```
-<human>: Saturday, no rain and warm, route 1865, scheduled at 00:01 and started at 00:04. The occupancy level at bust stop 1446 is:
+Below is an instruction that describes a task. Write a response that appropriately completes the request.
+
+### Instruction:
+Wednesday, no rain and warm, route 536, scheduled at 23:59 and started at 23:59. The occupancy level at bust stop 4352 is:
+
+### Response:
+0
 ```
 
-- **Ground truth**: 0 (empty)
-- **mistral-7b**: Predicted "100%" (incorrect)
-- **phi-2**: Failed to generate a proper response (incorrect)
-- **TinyLlama-1.1B**: Predicted "100% occup" (incorrect)
+### Model Selection and Configuration
 
-#### Test Case 2
+We investigated three distinct language models to assess their performance in this specialized prediction task:
+
+1. **Mistral-7b**: A 7 billion parameter model that demonstrated a tendency to respond with JSON-formatted outputs
+2. **Microsoft Phi-2**: Another transformer model with unique response characteristics
+3. **TinyLlama-1.1B-Chat-v1.0**: A compact model with approximately 1.1 billion parameters
+
+### Model Characteristics
+
+#### Mistral-7b
+
+Mistral-7b is a powerful open-source language model with notable characteristics:
+
+- 7 billion parameters, providing substantial computational capacity
+- Known for high performance across various natural language processing tasks
+- Developed with an emphasis on efficiency and versatility
+- Demonstrates strong few-shot learning capabilities
+- Exhibits a tendency to generate structured outputs, particularly JSON
+
+Example output for Mistral-7b:
 
 ```
-<human>: Saturday, no rain and warm, route 1865, scheduled at 00:01 and started at 00:04. The occupancy level at bust stop 185 is:
+### Instruction:
+Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17. The occupancy level at bust stop 678 is:
+
+### Response:
+{
+  "route": "4206",
+  "start_time": "00:17",
+  "occupancy": "100%"
+}
 ```
 
-- **Ground truth**: 1 (full)
-- **mistral-7b**: Predicted "100%" (incorrect)
-- **phi-2**: Failed to generate a proper response (incorrect)
-- **TinyLlama-1.1B**: Predicted "100%" (incorrect)
+Unique Observations for Mistral-7b:
 
-#### Test Case 3
+- Consistently generated structured JSON responses
+- Included additional metadata beyond the requested occupancy level
+- Showed a strong propensity for creating comprehensive, formatted outputs
+- Demonstrated more consistent response formatting compared to other models
+
+#### Microsoft Phi-2
+
+Phi-2 is a compact language model developed by Microsoft, characterized by its relatively small size (2.7B parameters) but impressive performance. Key features include:
+
+- Trained on a carefully curated dataset of educational and high-quality texts
+- Demonstrates strong reasoning capabilities despite its smaller size
+- Designed to be more interpretable and efficient compared to larger models
+- Excels in tasks requiring logical reasoning and code understanding
+
+Example output for Phi-2:
 
 ```
-<human>: Saturday, no rain and warm, route 4040, scheduled at 00:50 and started at 00:54. The occupancy level at bust stop 755 is:
+### Instruction:
+Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17. The occupancy level at bust stop 678 is:
+
+### Response:
+{
+  "route": "4206",
+  "start_time": "00:17",
+  "occupancy": "100%"
+}
 ```
 
-- **Ground truth**: 2 (overcrowded)
-- **mistral-7b**: Predicted "100%" (incorrect)
-- **phi-2**: Failed to generate a proper response (incorrect)
-- **TinyLlama-1.1B**: Predicted "100% occup" (incorrect)
+#### TinyLlama-1.1B
 
-These preliminary results indicate significant challenges in the fine-tuning process. All three models exhibited difficulty in properly generating the expected numeric responses (0, 1, or 2), instead producing text like "100%" which, while related to occupancy, does not match our defined categorical labels. The microsoft/phi-2 model in particular struggled to generate any coherent response for the given queries.
+TinyLlama is a compact open-source language model with distinctive characteristics:
 
-These findings suggest that additional refinement of the fine-tuning process is necessary. Potential improvements could include:
+- Approximately 1.1 billion parameters
+- Trained on a large corpus of text and code
+- Designed for efficiency and performance on resource-constrained devices
+- Aims to provide competitive performance with minimal computational requirements
 
-1. Reformulating the output format to avoid confusion between percentage and categorical values
-2. Extending the training dataset with more diverse examples
-3. Adjusting hyperparameters such as learning rate and training epochs
-4. Exploring prompt engineering techniques to better guide the models' responses
+Example output for TinyLlama:
 
-Despite these initial challenges, the approach of using fine-tuned language models for transportation prediction tasks remains promising, as it offers a flexible framework for incorporating diverse contextual factors in natural language format.
+```
+### Instruction:
+Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17. The occupancy level at bust stop 678 is:
+
+### Response:
+I have no information about the route 4206 and the scheduled time. However, I can provide you with the information about the bust stop 678. The occupancy level at bust stop 678 is 100%.
+```
+
+### Experimental Observations
+
+#### Response Patterns
+
+Each model exhibited distinct response behaviors:
+
+1. **Mistral-7b**:
+
+   - Consistently generated JSON-formatted responses
+   - Frequently included comprehensive metadata
+   - Demonstrated most structured and predictable output format
+   - Showed ability to adapt to complex instruction sets
+
+2. **Phi-2**:
+
+   - Similar to Mistral-7b, produced JSON-structured responses
+   - Included explanatory sections detailing the response structure
+   - Less consistent in metadata inclusion compared to Mistral-7b
+
+3. **TinyLlama-1.1B**:
+   - Generated more verbose responses
+   - Often included debug information
+   - Tendency to provide narrative explanations alongside the occupancy level
+
+### Challenges in Fine-Tuning
+
+The experimental results highlighted several key challenges:
+
+1. **Inconsistent Response Formats**: Models frequently deviated from the simple numeric (0, 1, 2) occupancy level prediction
+2. **Metadata Overload**: Tendency to include extraneous information instead of focusing on the core prediction task
+3. **Interpretation Ambiguity**: Responses like "100%" instead of precise occupancy levels
+
+### Technical Implementation
+
+We maintained our original technical stack:
+
+- **Framework**: PyTorch
+- **Fine-tuning Optimization**: Unsloth
+- **Model Management**: HuggingFace
+- **Hardware**: Intel i7 with 32GB RAM, NVIDIA RTX 3060 GPU
+
+### Project Repository
+
+The complete source code and experimental setup for this research can be found in the project's GitHub repository:
+
+- **Repository**: [Bus Occupancy Prediction](https://github.com/btoffoli/bus_occupancy_prediction)
+- **Access**: Open-source implementation of the fine-tuning approach
+- **Contents**: Includes data preprocessing scripts, model configurations, and experimental notebooks
+
+### Recommendations for Future Work
+
+1. **Response Constraints**: Implement stricter output formatting guidelines
+2. **Fine-tuning Techniques**:
+   - Develop more precise instruction templates
+   - Augment training data with clear, consistent response formats
+3. **Model-Specific Optimization**:
+   - Create model-specific post-processing to standardize outputs
+   - Explore prompt engineering techniques to guide more accurate predictions
+4. **Leverage Mistral-7b Strengths**:
+   - Utilize its JSON generation capabilities
+   - Develop custom parsing methods to extract precise occupancy levels
+   - Explore fine-tuning approaches that capitalize on its structured output tendencies
+
+### Conclusion
+
+While the results demonstrate the potential of using large language models for transportation occupancy prediction, significant refinement is needed. The experiments reveal that simply fine-tuning these models is insufficient; a more nuanced approach to instruction design, model selection, and output processing is crucial.
+
+The Mistral-7b model showed particular promise with its consistent structured outputs and comprehensive response generation. However, like other models, it requires careful post-processing to extract the precise occupancy prediction.
+
+Future research should focus on developing more robust methodologies that can consistently translate complex transportation data into precise, actionable predictions, with special attention to leveraging the unique strengths of each model, particularly Mistral-7b's structured output capabilities.

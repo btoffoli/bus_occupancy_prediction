@@ -75,8 +75,9 @@ def convert_to_text(
         register: dict,
     ):
     resp = convert_to_json(register)
+    return resp['text']
     # return f"<human>{resp['input']}<bot>{resp['']}"
-    return f"""<human>: {resp['input']}\n<bot>: {resp['output']}\n\n"""
+    # return f"""<human>: {resp['input']}\n<bot>: {resp['output']}\n\n"""
 
 
     
@@ -128,7 +129,7 @@ def convert_to_json(
         .replace("%occupancyLevel", occupancy)
     
 
-    text = f"{header}\n\n### Instruction:\n{human_speaking}\n\n### Response:\n{bot_speaking}"
+    text = f"{header}\n\n### Instruction:\n{human_speaking}\n\n### Response:\n{bot_speaking}\n\n\n"
     
 
     return {
@@ -350,7 +351,7 @@ class BusOccupancyFineTune:
 
     def __load_model_for_training(self, **kwargs):
         self.max_length = kwargs.get("max_length", 128)
-        self.batch_size = kwargs.get("batch_size", 16)
+        self.batch_size = kwargs.get("batch_size", 128)
         self.learning_rate = kwargs.get("learning_rate", 2e-5)
         self.num_epochs = kwargs.get("num_epochs", 3) 
         load_in_4bit = kwargs.get("load_in_4bit", False)
@@ -389,7 +390,7 @@ class BusOccupancyFineTune:
             "model.norm": 0,
             "lm_head": 0
         }
-        # device_map = "auto"
+        device_map = "auto"
 
         logger.info(f"self.model_name: {self.model_name}")
 
@@ -432,7 +433,7 @@ class BusOccupancyFineTune:
         inputs = self.tokenizer(text, return_tensors="pt")
         if torch.cuda.is_available():
             inputs = inputs.to("cuda")
-        outputs = self.model.generate(**inputs, max_new_tokens=5)
+        outputs = self.model.generate(**inputs, max_new_tokens=200)
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
     
     def convert_datasets(self, type_of_database: str | Dict = Dict):
@@ -474,13 +475,13 @@ class BusOccupancyFineTune:
         logger.debug(f"Reading datasets in batches: {self.datasets_path}")
         filenames = sorted(os.listdir(self.datasets_path))
         logger.debug(f"filenames: {filenames}")
+        acc = []
         for f in filenames:
             if f.endswith('.jsonl'):
                 logger.debug(f"Processing file: {f}")
                 file_path = os.path.join(self.datasets_path, f)
                 if os.path.isfile(file_path):
-                    df = pd.read_json(file_path, lines=True)
-                    acc = []
+                    df = pd.read_json(file_path, lines=True)                    
                     for index, row in df.iterrows():
                         if type_of_database == Dict:
                             acc.append(convert_to_json(row))
