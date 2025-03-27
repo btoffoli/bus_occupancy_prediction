@@ -53,6 +53,8 @@ def convert_tz(str_dt: str, tz: timezone):
     d = datetime.fromisoformat(str_dt)
     return d.astimezone(tz)
 
+header = "Below is an instruction that describes a task. Write a response that appropriately completes the request."
+
 {"instruction":"","input":"wednesday, no rain and cold, route 2856, scheduled at 00:00 and started at 00:00. The occupancy level at bust stop 3241 is:","output":"0"}
 
 # human_speaks = "Sabendo que está %clima_tempo e a temperatura é %temperatura. Qual a lotação da linha %linha para o ponto %ponto para %dia às %hora?"
@@ -124,11 +126,16 @@ def convert_to_json(
         .replace("%trip_route_id", str(trip_route_id))\
         .replace("%day_of_week", dw)\
         .replace("%occupancyLevel", occupancy)
+    
+
+    text = f"{header}\n\n### Instruction:\n{human_speaking}\n\n### Response:\n{bot_speaking}"
+    
 
     return {
         "instruction": human_speaking,
         "input": "",
-        "output": bot_speaking,        
+        "output": bot_speaking,
+        "text": text,               
     }
     # return f"""<human>: {human_speaking}\n<bot>:{bot_speaking}\n\n"""
 
