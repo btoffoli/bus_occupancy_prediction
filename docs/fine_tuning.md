@@ -1,6 +1,6 @@
 ## How to make a Fine tune
 
-There is to two aprroaches todo this, one where you can use a fine_tune.py a another using a python notebooks presents in this project. This documentation is if you wants to use the first way. For other way, come back to root documentation, and choice in options bellow, between: Mistral, Tinny-llama and Phi-2.
+There are to two aprroaches todo this, one where you can use a fine_tune.py a another using a python notebooks presents in this project. This documentation is if you wants to use the first way. For other way, come back to root documentation, and choice in options bellow, between: Mistral, Tinny-llama and Phi-2.
 
 ### Data Preparation
 

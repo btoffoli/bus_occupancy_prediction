@@ -44,10 +44,16 @@
             "type": "debugpy",
             "request": "launch",
             "args": ["--mode", "convert_dataset_text", "--datasets_path", "./data"],
-            
-
             "program": "fine_tune.py"
         },
+
+        {
+          "name": "fine_tune_convert_dataset",
+          "type": "debugpy",
+          "request": "launch",
+          "args": ["--mode", "convert_dataset", "--datasets_path", "./data_converted_jsonl_teste"],
+          "program": "fine_tune.py"
+      },
 
 
       

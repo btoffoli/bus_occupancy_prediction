@@ -9,13 +9,13 @@ hero:
   actions:
     - theme: brand
       text: Readme
-      link: /docs/data_prepare
+      link: /data_prepare
     - theme: brand
       text: Article
-      link: /docs/article.claude
+      link: /article.claude
     - theme: alt
       text: fine tuning
-      link: /docs/fine_tuning
+      link: /fine_tuning
 
 features:
   - title: Mistral

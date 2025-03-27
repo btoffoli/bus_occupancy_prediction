@@ -20,7 +20,7 @@ logs
 results
 tuned_*
 # .vscode
-.vitepress/cache
+/**/.vitepress/cache
 node_modules
 **.orig
 launch_*

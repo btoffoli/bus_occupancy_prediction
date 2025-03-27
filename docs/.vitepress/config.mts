@@ -17,10 +17,10 @@ export default defineConfig({
       {
         text: "Fine tune",
         items: [
-          { text: "How to make a Fine tune", link: "/docs/fine_tuning" },
+          { text: "How to make a Fine tune", link: "/fine_tuning" },
           {
             text: "Fine tune with notebook",
-            link: "/docs/fine_tuning_with_notebook",
+            link: "/fine_tuning_with_notebook",
           },
         ],
       },
@@ -29,18 +29,19 @@ export default defineConfig({
         items: [
           {
             text: "How to make a prediction without notebook",
-            link: "/docs/fine_tuning#running-prediction-with-mistral-example",
+            link: "/fine_tuning#running-prediction-with-mistral-example",
           },
         ],
       },
       {
         text: "Article",
-        items: [
-          {
-            text: "Article",
-            link: "/docs/article.claude",
-          },
-        ],
+        link: "/article.claude",
+        // items: [
+        //   {
+        //     text: "Article",
+
+        //   },
+        // ],
       },
     ],
 
