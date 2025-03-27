@@ -9,10 +9,13 @@ In this research, we address the challenge of predicting bus occupancy levels ca
 The data preparation process underwent a significant transformation to better align with modern large language model (LLM) fine-tuning approaches. We adopted an instruction-based format that provides clear context and a specific prediction request. The new format includes:
 
 ```
-Below is an instruction that describes a task. Write a response that appropriately completes the request.
+Below is an instruction that describes a task.
+Write a response that appropriately completes the request.
 
 ### Instruction:
-[Day], [precipitation status] and [temperature status], route [route number], scheduled at [scheduled time] and started at [actual start time]. The occupancy level at bust stop [stop number] is:
+[Day], [precipitation status] and [temperature status], route [route number],
+scheduled at [scheduled time] and started at [actual start time].
+The occupancy level at bust stop [stop number] is:
 
 ### Response:
 [Occupancy Level: 0, 1, or 2]
@@ -21,10 +24,12 @@ Below is an instruction that describes a task. Write a response that appropriate
 Example input:
 
 ```
-Below is an instruction that describes a task. Write a response that appropriately completes the request.
+Below is an instruction that describes a task.
+Write a response that appropriately completes the request.
 
 ### Instruction:
-Wednesday, no rain and warm, route 536, scheduled at 23:59 and started at 23:59. The occupancy level at bust stop 4352 is:
+Wednesday, no rain and warm, route 536, scheduled at 23:59 and started at 23:59.
+The occupancy level at bust stop 4352 is:
 
 ### Response:
 0
@@ -54,7 +59,8 @@ Example output for Mistral-7b:
 
 ```
 ### Instruction:
-Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17. The occupancy level at bust stop 678 is:
+Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17.
+The occupancy level at bust stop 678 is:
 
 ### Response:
 {
@@ -84,7 +90,8 @@ Example output for Phi-2:
 
 ```
 ### Instruction:
-Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17. The occupancy level at bust stop 678 is:
+Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17.
+The occupancy level at bust stop 678 is:
 
 ### Response:
 {
@@ -107,10 +114,13 @@ Example output for TinyLlama:
 
 ```
 ### Instruction:
-Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17. The occupancy level at bust stop 678 is:
+Thursday, no rain and warm, route 4206, scheduled at 00:20 and started at 00:17.
+The occupancy level at bust stop 678 is:
 
 ### Response:
-I have no information about the route 4206 and the scheduled time. However, I can provide you with the information about the bust stop 678. The occupancy level at bust stop 678 is 100%.
+I have no information about the route 4206 and the scheduled time.
+However, I can provide you with the information about the bust stop 678.
+The occupancy level at bust stop 678 is 100%.
 ```
 
 ### Experimental Observations
@@ -183,3 +193,13 @@ While the results demonstrate the potential of using large language models for t
 The Mistral-7b model showed particular promise with its consistent structured outputs and comprehensive response generation. However, like other models, it requires careful post-processing to extract the precise occupancy prediction.
 
 Future research should focus on developing more robust methodologies that can consistently translate complex transportation data into precise, actionable predictions, with special attention to leveraging the unique strengths of each model, particularly Mistral-7b's structured output capabilities.
+
+### References
+
+Vaswani et al., "Attention is All You Need," NeurIPS 2017.
+
+PyTorch Documentation: https://pytorch.org/docs/stable/index.html
+
+Unsloth Documentation: https://docs.unsloth.ai/
+
+HuggingFace Documentation: https://huggingface.co/docs/transformers/index
