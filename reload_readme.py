@@ -2,7 +2,7 @@ import os
 
 
 static_content = '''
-### Running completed documentation as a blog
+### Running complete documentation as a blog
 
 - Using npm, pnpm or yarn
 
